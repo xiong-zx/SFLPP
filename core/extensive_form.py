@@ -135,19 +135,24 @@ def sample_extensive_form(
 def build_extensive_form_model(
     ext_form: ExtensiveForm,
     risk_measure: str = "expectation",
+    alpha: float = 0.1,
 ) -> Tuple[gp.Model, Dict[str, Any]]:
     """
     Build an extensive-form MIQP model from an ExtensiveForm object.
 
     Returns:
         model: Gurobi model
-        vars:  dict with keys 'x', 'q', 's', and optionally 'z_worst'
+        vars:  dict with keys 'x', 'q', 's', 'p', and optionally 'z_worst'
     """
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError("alpha must be in [0, 1).")
+
     inst = ext_form.instance
     I, J, W = ext_form.I, ext_form.J, ext_form.W
     f = inst.f
     a = inst.a
     b = inst.b
+    cfg = inst.config
     scenarios = ext_form.scenarios
 
     m = gp.Model("SCFLP_extensive")
@@ -155,9 +160,17 @@ def build_extensive_form_model(
     # first-stage binaries x_j
     x = m.addVars(J, vtype=GRB.BINARY, name="x")
 
-    # second-stage continuous q_ij^w, s_i^w
+    # second-stage continuous q_ij^w, s_i^w, and price decisions p_i^w
     q = m.addVars(I, J, W, lb=0.0, vtype=GRB.CONTINUOUS, name="q")
     s = m.addVars(I, W, lb=0.0, vtype=GRB.CONTINUOUS, name="s")
+    p = m.addVars(
+        I,
+        W,
+        lb=cfg.p_min,
+        ub=cfg.p_max,
+        vtype=GRB.CONTINUOUS,
+        name="p",
+    )
 
     # s_i^w = Σ_j q_ij^w
     for w in W:
@@ -176,6 +189,19 @@ def build_extensive_form_model(
                 name=f"cap_j{j}_w{w}",
             )
 
+    # demand fulfillment bounds: (1-alpha) h_i(p_i^w) ≤ s_i^w ≤ h_i(p_i^w)
+    for w in W:
+        for i in I:
+            demand_at_price = -a[i] * p[i, w] + b[i]
+            m.addConstr(
+                s[i, w] <= demand_at_price,
+                name=f"demand_upper_i{i}_w{w}",
+            )
+            m.addConstr(
+                s[i, w] >= (1.0 - alpha) * demand_at_price,
+                name=f"demand_lower_i{i}_w{w}",
+            )
+
     # objective
     if risk_measure == "expectation":
         obj = gp.QuadExpr()
@@ -187,14 +213,10 @@ def build_extensive_form_model(
             scen = scenarios[w]
             weight = scen.weight
             for i in I:
-                a_i = a[i]
-                b_i = b[i]
                 # Σ_j bar_c_ij(ω) q_ij^w
                 obj += weight * gp.quicksum(scen.bar_c[(i, j)] * q[i, j, w] for j in J)
-                # - (b_i / a_i) s_i^w
-                obj += weight * (-(b_i / a_i) * s[i, w])
-                # + (1/a_i) (s_i^w)^2
-                obj += weight * ((1.0 / a_i) * s[i, w] * s[i, w])
+                # - p_i^w Σ_j q_ij^w
+                obj += weight * (-(p[i, w] * s[i, w]))
 
         m.setObjective(obj, GRB.MINIMIZE)
         z_worst = None
@@ -207,11 +229,8 @@ def build_extensive_form_model(
             scen = scenarios[w]
             scenario_expr = gp.QuadExpr()
             for i in I:
-                a_i = a[i]
-                b_i = b[i]
                 scenario_expr += gp.quicksum(scen.bar_c[(i, j)] * q[i, j, w] for j in J)
-                scenario_expr += -(b_i / a_i) * s[i, w]
-                scenario_expr += (1.0 / a_i) * s[i, w] * s[i, w]
+                scenario_expr += -(p[i, w] * s[i, w])
 
             m.addConstr(z_worst >= scenario_expr, name=f"worstcase_w{w}")
 
@@ -227,6 +246,7 @@ def build_extensive_form_model(
         "x": x,
         "q": q,
         "s": s,
+        "p": p,
         "z_worst": z_worst,
     }
     return m, var_dict
