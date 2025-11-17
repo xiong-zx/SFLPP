@@ -1,4 +1,5 @@
 # %%
+import os
 from core.data import Config, Instance
 from core.extensive_form import sample_extensive_form, build_extensive_form_model
 from core.solver import solve_gurobi_model
@@ -19,6 +20,7 @@ def main():
 
     ext = sample_extensive_form(inst, n_scenarios=10, seed=123)
 
+    os.makedirs("log", exist_ok=True)
     ext.save_json("log/extensive_form_example.json")
 
     model, vars_dict = build_extensive_form_model(ext, risk_measure="expectation")
@@ -27,6 +29,8 @@ def main():
 
     x = vars_dict["x"]
     q = vars_dict["q"]
+    p = vars_dict["p"]
+    s = vars_dict["s"]
 
     if model.Status == 2:  # GRB.OPTIMAL
         print("\n=== Solution summary ===")
@@ -36,12 +40,17 @@ def main():
         print("Opened facilities:", open_facilities)
 
         # Show served quantity for scenario 0
-        print("\nServed quantities in scenario 0:")
+        # print("\nServed quantities in scenario 0:")
         w0 = 0
+        # for i in inst.I:
+        #     total_i = sum(q[i, j, w0].X for j in inst.J)
+        #     if total_i > 1e-6:
+        #         print(f"  Customer {i}: total served = {total_i:.2f}")
+
+        # Show optimal prices and sales for scenario 0
+        print("\nOptimal prices and sales in scenario 0:")
         for i in inst.I:
-            total_i = sum(q[i, j, w0].X for j in inst.J)
-            if total_i > 1e-6:
-                print(f"  Customer {i}: total served = {total_i:.2f}")
+            print(f"  Customer {i}: price = {p[i, w0].X:.2f}, sales = {s[i, w0].X:.2f}")
 
 
 # %%
