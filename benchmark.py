@@ -21,6 +21,7 @@ from core.data import Config, Instance
 from core.extensive_form import sample_extensive_form, build_extensive_form_model
 from core.discrete_price import solve_benders_discrete_price, DiscretePriceConfig
 from core.benders_linear import solve_benders_linearized
+from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
 
 
 def run_extensive_form(
@@ -137,6 +138,68 @@ def run_discrete_price_benders(
             'method': 'Discrete Prices + Benders',
             'n_scenarios': n_scenarios,
             'n_price_levels': n_price_levels,
+            'status': 'failed',
+            'objective': None,
+            'time': solve_time,
+            'error': str(e),
+        }
+
+
+def run_progressive_hedging(
+    inst: Instance,
+    n_scenarios: int,
+    rho: float = 1000.0,
+    seed: int = 42,
+    max_iterations: int = 100,
+    verbose: int = 0,
+) -> Dict:
+    """Run Progressive Hedging approach."""
+    print(f"\n{'='*70}")
+    print(f"PROGRESSIVE HEDGING: {n_scenarios} scenarios, rho={rho}")
+    print(f"{'='*70}")
+
+    # Sample scenarios
+    ext_form = sample_extensive_form(inst, n_scenarios=n_scenarios, seed=seed)
+
+    start_time = time.time()
+    try:
+        ph_results = solve_with_ph(
+            ext_form=ext_form,
+            rho=rho,
+            max_iter=max_iterations,
+            alpha=0.1,  # Using the same alpha as other methods
+            tol=1e-4,
+        )
+        solve_time = time.time() - start_time
+
+        # Evaluate the final integer solution to get the true objective value
+        final_x = ph_results["final_x"]
+        objective = evaluate_first_stage_solution(final_x, ext_form, alpha=0.1)
+        n_facilities = sum(1 for v in final_x.values() if v > 0.5)
+
+        print(f"Status: {'CONVERGED' if ph_results['converged'] else 'MAX_ITER'}")
+        print(f"Objective: {objective:.2f}")
+        print(f"Facilities: {n_facilities}")
+        print(f"Iterations: {ph_results['iterations']}")
+        print(f"Time: {solve_time:.2f}s")
+
+        return {
+            'method': 'Progressive Hedging',
+            'n_scenarios': n_scenarios,
+            'rho': rho,
+            'status': 'converged' if ph_results['converged'] else 'max_iter',
+            'objective': objective,
+            'time': solve_time,
+            'iterations': ph_results['iterations'],
+            'n_facilities': n_facilities,
+        }
+    except Exception as e:
+        solve_time = time.time() - start_time
+        print(f"Status: FAILED ({str(e)})")
+        return {
+            'method': 'Progressive Hedging',
+            'n_scenarios': n_scenarios,
+            'rho': rho,
             'status': 'failed',
             'objective': None,
             'time': solve_time,
@@ -276,6 +339,19 @@ def run_comprehensive_benchmark(
             if baseline_time and result.get('time'):
                 result['speedup'] = baseline_time / result['time']
             results.append(result)
+
+        # 4. Progressive Hedging
+        # We can test a default rho value, or a list of them
+        default_rho = 1000.0
+        result = run_progressive_hedging(
+            inst, n_scenarios, rho=default_rho, seed=seed, max_iterations=100, verbose=0
+        )
+        # Add comparison to baseline
+        if baseline_obj and result.get('objective'):
+            result['gap_vs_optimal'] = (result['objective'] - baseline_obj) / abs(baseline_obj)
+        if baseline_time and result.get('time'):
+            result['speedup'] = baseline_time / result['time']
+        results.append(result)
 
     # Create DataFrame
     df = pd.DataFrame(results)
