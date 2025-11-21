@@ -155,6 +155,9 @@ def build_extensive_form_model(
     cfg = inst.config
     scenarios = ext_form.scenarios
 
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError("alpha must be in [0, 1).")
+
     m = gp.Model("SCFLP_extensive")
 
     # first-stage binaries x_j
