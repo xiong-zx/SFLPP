@@ -1,0 +1,209 @@
+%!TEX root=main.tex
+\newif\ifspacehack
+\usepackage{hyperref,url,xcolor}
+\hypersetup{
+    colorlinks,
+    breaklinks,
+    linkcolor = blue,
+    citecolor = blue,
+    urlcolor  = blue,
+}
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage{tcolorbox}
+\usepackage{footnote}
+\usepackage{float}
+\usepackage{xspace}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{framed}
+\usepackage{bbm}
+\usepackage{nicefrac}
+\usepackage{makecell}
+\usepackage{algorithm}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{microtype}
+\usepackage{bm}
+\makesavenoteenv{tabular}
+\makesavenoteenv{table}
+
+\renewcommand{\tilde}{\widetilde}
+\renewcommand{\hat}{\widehat}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{remark}{Remark}
+
+\newcommand{\eps}{\epsilon}
+\newcommand{\calA}{{\mathcal{A}}}
+\newcommand{\calB}{{\mathcal{B}}}
+\newcommand{\calX}{{\mathcal{X}}}
+\newcommand{\calS}{{\mathcal{S}}}
+\newcommand{\calF}{{\mathcal{F}}}
+\newcommand{\calI}{{\mathcal{I}}}
+\newcommand{\calJ}{{\mathcal{J}}}
+\newcommand{\calK}{{\mathcal{K}}}
+\newcommand{\calD}{{\mathcal{D}}}
+\newcommand{\calE}{{\mathcal{E}}}
+\newcommand{\calR}{{\mathcal{R}}}
+\newcommand{\calT}{{\mathcal{T}}}
+\newcommand{\calP}{{\mathcal{P}}}
+\newcommand{\calQ}{{\mathcal{Q}}}
+\newcommand{\calZ}{{\mathcal{Z}}}
+\newcommand{\calM}{{\mathcal{M}}}
+\newcommand{\calN}{{\mathcal{N}}}
+\newcommand{\calW}{{\mathcal{W}}}
+\newcommand{\KL}{\text{\rm KL}}
+
+\DeclareMathOperator*{\diag}{diag}
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
+\usepackage{lipsum,booktabs}
+\usepackage{amsmath,mathrsfs,amsfonts,enumitem}
+\usepackage{rotating}
+\usepackage{pdflscape}
+\allowdisplaybreaks
+\usepackage{appendix}
+\usepackage{multirow,makecell,tabularx}
+
+\renewcommand{\algorithmicrequire}{ \textbf{Input:}}
+\renewcommand{\algorithmicensure}{ \textbf{Output:}}
+
+\renewcommand{\tilde}{\widetilde}
+\renewcommand{\hat}{\widehat}
+
+% define some macros
+\def \A {\mathcal{A}}
+\def \B {\mathcal{B}}
+\def \C {\mathcal{C}}
+\def \D {\mathcal{D}}
+\def \E {\mathbb{E}}
+\def \F {\mathcal{F}}
+\def \G {\mathcal{G}}
+\def \H {\mathcal{H}}
+\def \I {\mathcal{I}}
+\def \J {\mathcal{J}}
+\def \K {\mathcal{K}}
+\def \L {\mathcal{L}}
+\def \M {\mathcal{M}}
+\def \N {\mathbb{N}}
+\def \O {\mathcal{O}}
+\def \P {\mathcal{P}}
+\def \Q {\mathbb{Q}}
+\def \R {\mathbb{R}}
+\def \S {\mathcal{S}}
+\def \T {\mathcal{T}}
+\def \U {\mathcal{U}}
+\def \V {\mathcal{V}}
+\def \W {\mathcal{W}}
+\def \X {\mathcal{X}}
+\def \Y {\mathcal{Y}}
+\def \Z {\mathcal{Z}}
+
+\def \a {\mathbf{a}}
+\def \b {\mathbf{b}}
+\def \c {\mathbf{c}}
+\def \d {\mathbf{d}}
+\def \e {\mathbf{e}}
+\def \f {\mathbf{f}}
+\def \g {\mathbf{g}}
+\def \h {\mathbf{h}}
+\def \m {\mathbf{m}}
+\def \p {\mathbf{p}}
+\def \q {\mathbf{q}}
+\def \u {\mathbf{u}}
+\def \w {\mathbf{w}}
+\def \s {\mathbf{s}}
+\def \t {\mathbf{t}}
+\def \v {\mathbf{v}}
+\def \x {\mathbf{x}}
+\def \y {\mathbf{y}}
+\def \z {\mathbf{z}}
+
+\usepackage{mathtools}
+\let\oldnorm\norm   % <-- Store original \norm as \oldnorm
+\let\norm\undefined % <-- "Undefine" \norm
+\DeclarePairedDelimiter\norm{\lVert}{\rVert}
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}
+\newcommand\inner[2]{\langle #1, #2 \rangle}
+\newcommand*\diff{\mathop{}\!\mathrm{d}}
+\newcommand*\Diff[1]{\mathop{}\!\mathrm{d^#1}}
+
+% define new theorem environments
+\usepackage{amsthm}
+% \let\proof\relax
+% \let\endproof\relax
+% \newenvironment{proof}{\par\noindent{\bf Proof\ }}{\hfill\BlackBox\\[2mm]}
+% \renewcommand\qedsymbol{$\blacksquare$}
+\newtheorem{myThm}{Theorem}
+\newtheorem{myFact}{Fact}
+\newtheorem{myClaim}{Claim}
+\newtheorem{myLemma}[myThm]{Lemma}
+\newtheorem{myObservation}{Observation}
+\newtheorem{myProp}[myThm]{Proposition}
+\newtheorem{myProperty}{Property}
+
+\theoremstyle{definition}
+\newtheorem{myAssum}{Assumption}
+\newtheorem{myConj}{Conjecture}
+\newtheorem{myCor}{Corollary}
+\newtheorem{myDef}{Definition}
+\newtheorem{myExample}{Example}
+\newtheorem{myNote}{Note}
+\newtheorem{myProblem}{Problem}
+\newtheorem*{myProofSketch}{Proof Sketch}
+\newtheorem{myRemark}{Remark}
+\newtheorem*{myAnalysis}{\underline{Analysis}} 
+
+% add comments
+% define some color macros
+\usepackage{graphicx,subfigure,color} % more modern
+\newcommand{\red}{\color{red}}
+\definecolor{myblue}{RGB}{0,112,192}
+\newcommand\myBlue[1]{{\color{myblue} #1}}
+\definecolor{myred}{RGB}{192,0,1}
+\newcommand\myRed[1]{{\color{myred} #1}}
+\definecolor{wine_red}{RGB}{228,48,64}
+\definecolor{DSgray}{cmyk}{0,1,0,0}
+\newcommand{\Authornote}[2]{{\small\textcolor{wine_red}{\sf$<<<${  #1: #2 }$>>>$}}}
+\newcommand{\cindynote}[1]{{\small\myRed{\sf$<<<${  Cindy: #1 }$>>>$}}}
+\newcommand{\michaelnote}[1]{{\small\myRed{\sf$<<<${  Michael: #1 }$>>>$}}}
+\newcommand{\samnote}[1]{{\small\myRed{\sf$<<<${  Samuel: #1 }$>>>$}}}
+
+\usepackage{prettyref}
+\newcommand{\pref}[1]{\prettyref{#1}}
+\newcommand{\pfref}[1]{Proof of \prettyref{#1}}
+\newcommand{\savehyperref}[2]{\texorpdfstring{\hyperref[#1]{#2}}{#2}}
+\newrefformat{eq}{\savehyperref{#1}{{\color{black}Eq.}~\textup{(\ref*{#1})}}}
+\newrefformat{eqn}{\savehyperref{#1}{Equation~\ref*{#1}}}
+\newrefformat{lemma}{\savehyperref{#1}{{\color{black}Lemma}~\ref*{#1}}}
+\newrefformat{thm}{\savehyperref{#1}{{\color{black}Theorem}~\ref*{#1}}}
+\newrefformat{def}{\savehyperref{#1}{{\color{black}Definition}~\ref*{#1}}}
+\newrefformat{assumption}{\savehyperref{#1}{{\color{black}Assumption}~\ref*{#1}}}
+\newrefformat{fig}{\savehyperref{#1}{{\color{black}Figure}~\ref*{#1}}}
+\newrefformat{alg}{\savehyperref{#1}{{\color{black}Algorithm}~\ref*{#1}}}
+\newrefformat{sec}{\savehyperref{#1}{{\color{black}Section}~\ref*{#1}}}
+\newrefformat{appendix}{\savehyperref{#1}{\color{black}{Appendix}~\ref*{#1}}}
+
+
+\newrefformat{line}{\savehyperref{#1}{Line~\ref*{#1}}}
+\newrefformat{corr}{\savehyperref{#1}{Corollary~\ref*{#1}}}
+\newrefformat{cor}{\savehyperref{#1}{Corollary~\ref*{#1}}}
+\newrefformat{claim}{\savehyperref{#1}{Claim~\ref*{#1}}}
+
+\newrefformat{ex}{\savehyperref{#1}{Example~\ref*{#1}}}
+\newrefformat{rem}{\savehyperref{#1}{Remark~\ref*{#1}}}
+\newrefformat{conj}{\savehyperref{#1}{Conjecture~\ref*{#1}}}
+\newrefformat{prop}{\savehyperref{#1}{Proposition~\ref*{#1}}}
+\newrefformat{proto}{\savehyperref{#1}{Protocol~\ref*{#1}}}
+\newrefformat{prob}{\savehyperref{#1}{Problem~\ref*{#1}}}
+\newrefformat{que}{\savehyperref{#1}{Question~\ref*{#1}}}
+\newrefformat{op}{\savehyperref{#1}{Open Problem~\ref*{#1}}}
+\newrefformat{fn}{\savehyperref{#1}{Footnote~\ref*{#1}}}
+

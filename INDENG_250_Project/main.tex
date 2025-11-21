@@ -1,0 +1,263 @@
+\documentclass{article}
+\usepackage[final]{report-nips-style}
+\bibliographystyle{abbrvnat}
+\usepackage{algpseudocode}
+\input{myCommand}
+
+\def \Reg {\textsc{Reg}}
+
+\title{INDENG250 Project}
+\author{Xinqi Chen \And Zhixiao Xiong \And Shengan Xu}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Problem Setup}
+We study a facility location problem in which a firm must determine an optimal network of production facilities to serve a set of customers under uncertain tariff conditions. The strategic goal is twofold:
+\begin{enumerate}
+    \item Cost Efficiency: Minimize the firm’s total operational cost, including production, transportation, and tariff-related expenses.
+    \item Supply Resilience: Ensure reliable service to customers even when tariffs increase or fluctuate unpredictably.
+\end{enumerate}
+
+This introduces a richer economic interaction: choosing which facilities to open, how to route demand, and at what price to sell goods, while anticipating how customers respond to price changes. 
+
+We will consider a specific instance with a set of customers $I=\{1,...,n\}$ and a set of $m$ potential facility locations $J=\{1,...,m\}$. 
+
+\subsection{Parameters}
+\begin{itemize}
+  \item $f_j$: The \textit{deterministic} cost to open a facility at location $j\in J$.
+  \item $c_{ij}$: The \textit{deterministic} \textit{unit} cost of transportation from facility $j\in J$ to customer $i\in I$.
+  \item $h_i(p) = [- a_i p + b_i]_+$: The demand function of customer $i\in I$ with respect to the offered price $p$, where $a_i$ is the parameter of sensitivity to price and $b_i$ is the base demand.
+  \item $g_{ij}^{\omega}:$ The \textit{stochastic} \textit{unit} cost induced by the tariff from facility $j\in J$ to customer $i\in I$.
+  \item $\bar c_{ij}^{\omega} := c_{ij} + g_{ij}^{\omega}$: The \textit{combined} \textit{stochastic} cost from facility $j\in J$ to customer $i\in I$.
+  \item $u_j^{\omega}$: The \textit{stochastic} capacity of facility $j \in J$.
+  \item $\alpha$: The service level.
+  \item $\xi^{\omega} = \left(\{g_{ij}^{\omega}\}, \{u_j^{\omega}\}\right)$: All \textit{stochastic} information in scenario $\omega$.
+\end{itemize}
+
+\subsection{Decision Variables}
+\begin{itemize}
+  \item $x_j$: A binary variable, where $x_j=1$ if a facility is opened at location $j$, and $0$ otherwise.
+  \item $p_i^\omega$: The price on customer $i$ in scenario $\omega$. 
+  \item $q_{ij}^\omega$: The amount of customer $i$’s demand that is served by facility $j$ in scenario $\omega$.
+\end{itemize}
+
+\subsection{Two-Stage Stochastic Formulation}
+We decompose this problem into two stages. At the first stage, we decide whether we will open the facility at certain locations and after that we minimize our cost given the first-stage decision on locations by choosing optimal price and served demand.
+\paragraph{First stage}
+
+\begin{align*}
+    \min \quad & \sum_{j \in J} f_j x_j + \mathcal{Q}(x) \\
+    \text{s.t.} \quad & x_j \in \{0,1\} && \forall j \in J. \\
+\end{align*}
+
+where $\mathcal{Q}(x) = \mathcal{R}_\omega \left[ Q(x, \xi^{\omega})\right]$, $\mathcal{R}_\omega$ is a risk measure with stochasticity in $\omega$, and $Q(x,\xi^{\omega})$ is the objective function in the second stage.
+
+\paragraph{Second stage}
+
+\begin{align*}
+    Q(x,\xi^{\omega}) &= \min_{p_i^\omega, q_{ij}^\omega} - \sum_{i \in I}\sum_{j\in J} p_i^\omega  q_{ij}^\omega  + \sum_{i \in I} \sum_{j \in J}  q_{ij}^\omega (c_{ij}+g_{ij}^{\omega})  \\
+    &= \min_{p_i^\omega, q_{ij}^\omega} - \sum_{i \in I}\sum_{j\in J} (p_i^\omega -\bar c_{ij}^{\omega})  q_{ij}^\omega    \\
+    \text{s.t.} \quad 
+    & \sum_{j \in J} q_{ij}^\omega \geq (1-\alpha)h_i(p_i^\omega), && \forall i \in I,\\
+    & \sum_{j \in J} q_{ij}^\omega  \leq h_i(p_i^\omega), && \forall i \in I,\\
+    & \sum_{i \in I} q_{ij}^\omega \le u_j^{\omega} x_j &&  \forall j \in J, \\
+    & q_{ij}^\omega  \ge 0 && \forall i \in I,\; \forall j \in J.
+\end{align*}
+
+The company can adjust the selling price of its goods to mitigate the impact of tariffs, balancing the tradeoff between tariff-induced cost increases and the potential loss of demand due to higher prices. Moreover, prices are allowed to vary across different locations, enabling the firm to tailor its pricing strategy to regional cost structures, demand characteristics, and tariff exposures.
+
+Since there will be no demand if $p_i > \frac{b_i}{a_i}$, in which case making any goods tailored to customer $i$ will be non-profitable. We can restrict our model in the case $0 \leq p_i \leq \frac{b_i}{a_i}$. 
+
+Sometimes, it can be impractical to decide price in different scenarios.
+\subsection{Model with First-Stage Prices}
+
+We now treat the prices $\{p_i\}_{i \in I}$ as decisions that are common across all scenarios. Let $\Omega$ be the finite set of scenarios with probabilities $\pi_\omega$, $\omega \in \Omega$. We use expectation as the risk measure here.
+
+The two-stage stochastic program with first-stage prices is:
+\begin{subequations}\label{eq:model-firststage-prices}
+\begin{align}
+    \min_{x,p} \quad 
+    & \sum_{j \in J} f_j x_j 
+      + \sum_{\omega \in \Omega} \pi_\omega \, Q(x,p;\xi^\omega) \label{eq:master-objective-firststage}\\[2pt]
+    \text{s.t.} \quad
+    & 0 \le p_i \le \frac{b_i}{a_i}, && \forall i \in I, \label{eq:price-bounds-firststage}\\
+    & x_j \in \{0,1\}, && \forall j \in J. \label{eq:x-binary-firststage}
+\end{align}
+\end{subequations}
+
+Given a first-stage decision $(x,p)$ and a scenario 
+$\xi^\omega = \big(\{g_{ij}^\omega\}_{i,j}, \{u_j^\omega\}_{j}\big)$, the second-stage (recourse) problem is
+\begin{subequations}\label{eq:second-stage-firststage}
+\begin{align}
+    Q(x,p;\xi^\omega) 
+    = \min_{q^\omega} \quad 
+    & \sum_{i \in I} \sum_{j \in J} 
+      \big(c_{ij} + g_{ij}^\omega - p_i\big) \, q_{ij}^\omega \label{eq:sub-objective-firststage}\\
+    \text{s.t.} \quad
+    & \sum_{j \in J} q_{ij}^\omega 
+      \;\ge\; (1-\alpha)\, h_i(p_i)
+      = (1-\alpha)\big(b_i - a_i p_i\big),
+      && \forall i \in I, \label{eq:sub-lb-demand-firststage}\\
+    & \sum_{j \in J} q_{ij}^\omega 
+      \;\le\; h_i(p_i)
+      = b_i - a_i p_i,
+      && \forall i \in I, \label{eq:sub-ub-demand-firststage}\\
+    & \sum_{i \in I} q_{ij}^\omega 
+      \;\le\; u_j^\omega x_j,
+      && \forall j \in J, \label{eq:sub-capacity-firststage}\\
+    & q_{ij}^\omega \ge 0,
+      && \forall i \in I,\; \forall j \in J. \label{eq:sub-nonneg-firststage}
+\end{align}
+\end{subequations}
+
+Note that for fixed $(x,p)$ and $\omega \in \Omega$, the recourse problem
+\eqref{eq:second-stage-firststage} is a linear program in $q^\omega$.
+
+\subsection{Benders Decomposition}
+
+Benders decomposition exploits the fact that the recourse LP depends on the first-stage decisions $(x,p)$ only through the right-hand side (demand and capacity) and the objective coefficients, while the feasible set in the dual does not depend on $(x,p)$.
+
+\subsubsection{Subproblem and Dual}
+
+For a fixed $(x,p)$ and scenario $\omega$, the second-stage problem
+\eqref{eq:second-stage-firststage} can be written as
+\begin{equation*}
+\begin{aligned}
+\min_{q^\omega} \quad 
+& \sum_{i\in I}\sum_{j\in J} d_{ij}^\omega(p)\, q_{ij}^\omega \\
+\text{s.t.} \quad
+& \sum_{j \in J} q_{ij}^\omega \;\ge\; (1-\alpha)\big(b_i - a_i p_i\big), && \forall i \in I,\\
+& \sum_{j \in J} q_{ij}^\omega \;\le\; b_i - a_i p_i, && \forall i \in I,\\
+& \sum_{i \in I} q_{ij}^\omega \;\le\; u_j^\omega x_j, && \forall j \in J,\\
+& q_{ij}^\omega \ge 0, && \forall i \in I,\; \forall j \in J,
+\end{aligned}
+\end{equation*}
+where
+\[
+d_{ij}^\omega(p) := c_{ij} + g_{ij}^\omega - p_i.
+\]
+
+Let the dual variables be:
+\begin{itemize}
+    \item $\lambda_i^\omega \ge 0$ for the demand lower bounds,
+    \item $\mu_i^\omega \ge 0$ for the negated demand upper bounds,
+    \item $\nu_j^\omega \ge 0$ for the negated capacity constraints.
+\end{itemize}
+The dual of the second-stage LP is then
+\begin{subequations}\label{eq:dual-subproblem-firststage}
+\begin{align}
+    Q(x,p;\xi^\omega)
+    = \max_{\lambda^\omega,\mu^\omega,\nu^\omega \ge 0} \quad
+    & \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\lambda_i^\omega
+      - \sum_{i \in I}\big(b_i - a_i p_i\big)\mu_i^\omega
+      - \sum_{j \in J} u_j^\omega x_j \nu_j^\omega \label{eq:dual-obj-firststage}\\
+    \text{s.t.} \quad
+    & \lambda_i^\omega - \mu_i^\omega - \nu_j^\omega
+      \;\le\; c_{ij} + g_{ij}^\omega - p_i,
+      \quad \forall i \in I,\; \forall j \in J. \label{eq:dual-constraints-firststage}
+\end{align}
+\end{subequations}
+
+Observe that the dual feasible region defined by
+\eqref{eq:dual-constraints-firststage} does not depend on $(x,p)$; only the
+dual objective \eqref{eq:dual-obj-firststage} depends on $(x,p)$. Therefore,
+the recourse function $Q(x,p;\xi^\omega)$ is the pointwise maximum of affine
+functions in $(x,p)$ and is hence convex and piecewise linear.
+
+\subsubsection{Master Problem with Benders Cuts}
+
+We introduce auxiliary variables $\theta_\omega$ to represent the recourse
+cost in each scenario and formulate the Benders master problem in a
+multi-cut form:
+\begin{subequations}\label{eq:benders-master-firststage}
+\begin{align}
+    \min_{x,p,\theta} \quad
+    & \sum_{j \in J} f_j x_j 
+      + \sum_{\omega \in \Omega} \pi_\omega \theta_\omega \label{eq:benders-master-obj-firststage}\\
+    \text{s.t.} \quad
+    & 0 \le p_i \le \frac{b_i}{a_i}, && \forall i \in I, \label{eq:benders-price-bounds-firststage}\\
+    & x_j \in \{0,1\}, && \forall j \in J, \label{eq:benders-x-binary-firststage}\\
+    & \theta_\omega \;\ge\; B^\omega_k(x,p), && \forall \omega \in \Omega,\; \forall k \in \mathcal{K}_\omega. \label{eq:benders-cuts-firststage}
+\end{align}
+\end{subequations}
+Here, $\mathcal{K}_\omega$ is the index set of Benders cuts accumulated for
+scenario $\omega$. Each cut is derived from an optimal dual solution
+$(\bar\lambda^{\omega k},\bar\mu^{\omega k},\bar\nu^{\omega k})$ of
+\eqref{eq:dual-subproblem-firststage}, evaluated at some incumbent
+first-stage solution $(\bar x^{k},\bar p^{k})$, and has the form
+\begin{equation}
+\label{eq:benders-cut-expression-firststage}
+\begin{aligned}
+B^\omega_k(x,p)
+:=\;& \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\, \bar\lambda_{i}^{\omega k}
+ - \sum_{i \in I} \big(b_i - a_i p_i\big)\, \bar\mu_{i}^{\omega k}
+ - \sum_{j \in J} u_j^\omega x_j \, \bar\nu_{j}^{\omega k}.
+\end{aligned}
+\end{equation}
+
+Intuitively, each inequality \eqref{eq:benders-cuts-firststage} enforces that
+the master problem's estimate $\theta_\omega$ of the scenario recourse cost
+is at least as large as one of the supporting hyperplanes of the true
+recourse function $Q(x,p;\xi^\omega)$.
+
+\subsubsection{Benders Algorithm}
+
+The Benders decomposition algorithm proceeds iteratively as follows:
+\begin{enumerate}
+    \item \textbf{Master step.} Solve the master problem
+    \eqref{eq:benders-master-firststage} to obtain a candidate solution
+    $(x^{(t)},p^{(t)},\theta^{(t)})$.
+    \item \textbf{Subproblem step.} For each scenario $\omega \in \Omega$,
+    solve the second-stage LP \eqref{eq:second-stage-firststage} (or its
+    dual \eqref{eq:dual-subproblem-firststage}) with $(x^{(t)},p^{(t)})$
+    fixed, obtaining the optimal value $Q(x^{(t)},p^{(t)};\xi^\omega)$ and
+    an optimal dual solution
+    $(\bar\lambda^{\omega t},\bar\mu^{\omega t},\bar\nu^{\omega t})$.
+    \item \textbf{Cut generation.} For each $\omega \in \Omega$, if
+    $\theta_\omega^{(t)} < Q(x^{(t)},p^{(t)};\xi^\omega)$ (up to tolerance),
+    add the Benders cut
+    \[
+        \theta_\omega \;\ge\;
+        \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\, \bar\lambda_{i}^{\omega t}
+        - \sum_{i \in I} \big(b_i - a_i p_i\big)\, \bar\mu_{i}^{\omega t}
+        - \sum_{j \in J} u_j^\omega x_j \, \bar\nu_{j}^{\omega t}
+    \]
+    of the form \eqref{eq:benders-cut-expression-firststage} to the master
+    problem.
+    \item \textbf{Convergence check.} Compute a lower bound from the master
+    problem and an upper bound from the evaluated objective
+    \[
+        \sum_{j \in J} f_j x_j^{(t)} 
+        + \sum_{\omega \in \Omega} \pi_\omega
+          Q(x^{(t)},p^{(t)};\xi^\omega).
+    \]
+    If the optimality gap between these bounds is within a prescribed
+    tolerance, terminate; otherwise, return to Step~1 with the enriched
+    master problem.
+\end{enumerate}
+
+This decomposition exploits the linear structure of the recourse problems
+and yields a sequence of increasingly accurate polyhedral approximations of
+the expected recourse function in the space of first-stage decisions
+$(x,p)$.
+
+\section{Potential Extension}
+\paragraph{Algorithm}
+\begin{enumerate}
+    \item general benders decomposition 
+    \item progressive hedging \cindynote{to do}
+    \item Mccormick envelope linearization + standard benders \samnote{to do}
+\end{enumerate}
+
+\paragraph{Model and data}
+\michaelnote{to do}
+
+\section{Related Work}
+
+\citet{o2015hub, ahmadi2018profit,calvete2024bilevel,lin2023facility}
+
+\bibliography{ref}
+
+\end{document}

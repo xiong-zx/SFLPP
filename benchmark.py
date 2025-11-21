@@ -1,11 +1,9 @@
 """
 Comprehensive Benchmark: Comparing Solution Methods for SFLPP (pre-generated data)
 
-Three methods:
+Two methods:
 1. Extensive Form (exact MIQP)
-2. McCormick Linearization + Benders (LP relaxation, ~30-44% gap)
-3. Discrete Pricing + Benders (adjustable price levels)
-4. Progressive Hedging
+2. Progressive Hedging
 
 Config is loaded from config/{CONFIG_NAME}.json.
 Data is loaded from pre-generated instance or EF files in `data/`.
@@ -23,8 +21,6 @@ import pandas as pd
 
 from core.data import Instance
 from core.extensive_form import ExtensiveForm, build_extensive_form_model
-from core.discrete_price import DiscretePriceConfig, solve_benders_discrete_price
-from core.benders_linear import solve_benders_linearized
 from core.progressive_hedging import evaluate_first_stage_solution, solve_with_ph
 
 ROOT = Path(__file__).resolve().parent
@@ -38,8 +34,6 @@ class BenchmarkSettings:
     config_name: str = "c10_f10_cf1"  # base config filename without .json
     instance_idx: List[int] = None
     scenarios_list: List[int] = None
-    n_price_levels_list: List[int] = None
-    seed: int = 42  # used for any internal randomness (price configs, etc.)
     save_results: bool = True
 
     def __post_init__(self):
@@ -47,8 +41,6 @@ class BenchmarkSettings:
             self.instance_idx = [1]
         if self.scenarios_list is None:
             self.scenarios_list = [10, 20, 50]
-        if self.n_price_levels_list is None:
-            self.n_price_levels_list = [5, 10, 20]
 
 
 def instance_file_path(config_name: str, instance_idx: int) -> Path:
@@ -100,75 +92,6 @@ def run_extensive_form(ext_form: ExtensiveForm, verbose: int = 0) -> Dict:
             "status": "failed",
             "objective": None,
             "time": solve_time,
-        }
-
-
-def run_discrete_price_benders(
-    ext_form: ExtensiveForm,
-    n_price_levels: int = 13,
-    seed: int = 42,
-    max_iterations: int = 100,
-    verbose: int = 0,
-) -> Dict:
-    """Run discrete pricing + Benders approach."""
-    n_scenarios = len(ext_form.scenarios)
-
-    print(f"\n{'='*70}")
-    print(
-        f"DISCRETE PRICES + BENDERS: {n_scenarios} scenarios, {n_price_levels} price levels"
-    )
-    print(f"{'='*70}")
-
-    price_config = DiscretePriceConfig(
-        n_price_levels=n_price_levels, price_spacing="uniform"
-    )
-
-    start_time = time.time()
-    try:
-        benders_data, master_model, master_vars = solve_benders_discrete_price(
-            ext_form=ext_form,
-            price_config=price_config,
-            alpha=0.1,
-            max_iterations=max_iterations,
-            tolerance=1e-4,
-            verbose=verbose,
-        )
-        solve_time = time.time() - start_time
-
-        objective = benders_data.lower_bound
-        x_sol = benders_data.x_current
-        n_facilities = sum(1 for v in x_sol.values() if v > 0.5) if x_sol else 0
-        gap = benders_data.gap
-
-        print(f"Status: CONVERGED")
-        print(f"Objective: {objective:.2f}")
-        print(f"Gap: {gap:.4%}")
-        print(f"Facilities: {n_facilities}")
-        print(f"Iterations: {benders_data.iteration}")
-        print(f"Time: {solve_time:.2f}s")
-
-        return {
-            "method": "Discrete Prices + Benders",
-            "n_scenarios": n_scenarios,
-            "n_price_levels": n_price_levels,
-            "status": "converged",
-            "objective": objective,
-            "gap": gap,
-            "time": solve_time,
-            "iterations": benders_data.iteration,
-            "n_facilities": n_facilities,
-        }
-    except Exception as e:
-        solve_time = time.time() - start_time
-        print(f"Status: FAILED ({str(e)})")
-        return {
-            "method": "Discrete Prices + Benders",
-            "n_scenarios": n_scenarios,
-            "n_price_levels": n_price_levels,
-            "status": "failed",
-            "objective": None,
-            "time": solve_time,
-            "error": str(e),
         }
 
 
@@ -230,74 +153,13 @@ def run_progressive_hedging(
         }
 
 
-def run_mccormick_benders(
-    ext_form: ExtensiveForm,
-    max_iterations: int = 100,
-    verbose: int = 0,
-) -> Dict:
-    """Run McCormick linearization + Benders approach."""
-    n_scenarios = len(ext_form.scenarios)
-
-    print(f"\n{'='*70}")
-    print(f"MCCORMICK + BENDERS: {n_scenarios} scenarios")
-    print(f"⚠️  WARNING: McCormick creates ~30-44% relaxation gap")
-    print(f"{'='*70}")
-
-    start_time = time.time()
-    try:
-        benders_data, master_model, master_vars = solve_benders_linearized(
-            ext_form=ext_form,
-            alpha=0.1,
-            max_iterations=max_iterations,
-            tolerance=1e-4,
-            verbose=verbose,
-        )
-        solve_time = time.time() - start_time
-
-        objective = benders_data.lower_bound
-        x_sol = benders_data.x_current
-        n_facilities = sum(1 for v in x_sol.values() if v > 0.5) if x_sol else 0
-        gap = benders_data.gap
-
-        print(f"Status: CONVERGED")
-        print(f"Objective: {objective:.2f}")
-        print(f"Gap: {gap:.4%}")
-        print(f"Facilities: {n_facilities}")
-        print(f"Iterations: {benders_data.iteration}")
-        print(f"Time: {solve_time:.2f}s")
-
-        return {
-            "method": "McCormick + Benders",
-            "n_scenarios": n_scenarios,
-            "status": "converged",
-            "objective": objective,
-            "gap": gap,
-            "time": solve_time,
-            "iterations": benders_data.iteration,
-            "n_facilities": n_facilities,
-        }
-    except Exception as e:
-        solve_time = time.time() - start_time
-        print(f"Status: FAILED ({str(e)})")
-        return {
-            "method": "McCormick + Benders",
-            "n_scenarios": n_scenarios,
-            "status": "failed",
-            "objective": None,
-            "time": solve_time,
-            "error": str(e),
-        }
-
-
 def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
     """
-    Run comprehensive benchmark comparing all three approaches using pre-generated data.
+    Run comprehensive benchmark comparing Extensive Form and Progressive Hedging using pre-generated data.
     """
     config_name = settings.config_name
     instance_list = settings.instance_idx
     scenarios_list = settings.scenarios_list
-    n_price_levels_list = settings.n_price_levels_list
-    seed = settings.seed
     save_results = settings.save_results
 
     for instance_idx in instance_list:
@@ -313,7 +175,6 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
         print(f"{'#'*70}")
         print(f"Instance: {len(inst.I)} customers, {len(inst.J)} facilities")
         print(f"Scenarios to test: {scenarios_list}")
-        print(f"Discrete price levels: {n_price_levels_list}")
 
         results = []
 
@@ -334,32 +195,7 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
             baseline_obj = result.get("objective")
             baseline_time = result.get("time")
 
-            # 2. McCormick + Benders
-            result = run_mccormick_benders(ext_form, verbose=0)
-            # Add comparison to baseline
-            if baseline_obj and result.get("objective"):
-                result["gap_vs_optimal"] = (result["objective"] - baseline_obj) / abs(
-                    baseline_obj
-                )
-            if baseline_time and result.get("time"):
-                result["speedup"] = baseline_time / result["time"]
-            results.append(result)
-
-            # 3. Discrete Prices + Benders (test different price levels)
-            for n_price_levels in n_price_levels_list:
-                result = run_discrete_price_benders(
-                    ext_form, n_price_levels=n_price_levels, seed=seed, verbose=0
-                )
-                # Add comparison to baseline
-                if baseline_obj and result.get("objective"):
-                    result["gap_vs_optimal"] = (
-                        result["objective"] - baseline_obj
-                    ) / abs(baseline_obj)
-                if baseline_time and result.get("time"):
-                    result["speedup"] = baseline_time / result["time"]
-                results.append(result)
-
-            # 4. Progressive Hedging
+            # 2. Progressive Hedging
             # We can test a default rho value, or a list of them
             default_rho = 1000.0
             result = run_progressive_hedging(
@@ -390,8 +226,7 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
 
         # Create descriptive filename based on parameters
         scenarios_str = "_".join(map(str, scenarios_list))
-        prices_str = "_".join(map(str, n_price_levels_list))
-        filename_base = f"{config_name}_ins{instance_idx}_scenarios_{scenarios_str}_prices_{prices_str}"
+        filename_base = f"{config_name}_ins{instance_idx}_scenarios_{scenarios_str}"
 
         csv_file = os.path.join("results", f"{filename_base}.csv")
         df.to_csv(csv_file, index=False)
@@ -412,8 +247,6 @@ if __name__ == "__main__":
         config_name="c5_f5_cf1",
         instance_idx=[1, 2, 3],
         scenarios_list=[10, 20],
-        n_price_levels_list=[5, 13, 21],
-        seed=42,
         save_results=True,
     )
     run_comprehensive_benchmark(SETTINGS)
