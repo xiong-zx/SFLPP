@@ -13,7 +13,7 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-from .data import Instance, ScenarioData
+from .data import Instance, ScenarioData, save_pickle, load_pickle
 
 
 @dataclass
@@ -88,6 +88,17 @@ class ExtensiveForm:
             d = json.load(f)
         return cls.from_dict(d)
 
+    # Prefer pickle for large EF objects (faster & smaller on big scenario sets)
+    def save_pkl(self, path: str) -> None:
+        save_pickle(self, path)
+
+    @classmethod
+    def load_pkl(cls, path: str) -> "ExtensiveForm":
+        obj = load_pickle(path)
+        if not isinstance(obj, ExtensiveForm):
+            raise TypeError(f"File {path} does not contain an ExtensiveForm object.")
+        return obj
+
 
 def sample_extensive_form(
     inst: Instance,
@@ -95,8 +106,7 @@ def sample_extensive_form(
     seed: Optional[int] = None,
 ) -> ExtensiveForm:
     """
-    Given an Instance (distribution level), sample an ExtensiveForm
-    with n_scenarios scenarios (SAA / Monte Carlo).
+    Given an Instance, sample an ExtensiveForm with n_scenarios scenarios.
     """
     rng = np.random.default_rng(seed)
     I, J = inst.I, inst.J
@@ -154,9 +164,6 @@ def build_extensive_form_model(
     b = inst.b
     cfg = inst.config
     scenarios = ext_form.scenarios
-
-    if not (0.0 <= alpha < 1.0):
-        raise ValueError("alpha must be in [0, 1).")
 
     m = gp.Model("SCFLP_extensive")
 

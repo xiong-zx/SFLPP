@@ -9,6 +9,7 @@ Data structures for SFLPP configurations and instances.
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List, Tuple
 import json
+import pickle
 import numpy as np
 
 
@@ -123,8 +124,8 @@ class Instance:
         p_min, p_max, gamma = cfg.p_min, cfg.p_max, cfg.gamma
         if p_max <= p_min:
             raise ValueError("p_max must be greater than p_min.")
-        if not (0.0 < gamma < 1.0):
-            raise ValueError("gamma should be in (0,1).")
+        if not (0.0 <= gamma < 1.0):
+            raise ValueError("gamma should be in [0,1).")
 
         a: Dict[int, float] = {}
         b: Dict[int, float] = {}
@@ -138,10 +139,10 @@ class Instance:
         # base capacities (common for all scenarios, used by sampling)
         total_demand = sum(base_demand.values())
         avg_cap = cfg.base_capacity_factor * total_demand / len(J)
-        base_capacity = {
-            j: float(rng.integers(int(0.8 * avg_cap), int(1.2 * avg_cap) + 1))
-            for j in J
-        }
+        cap_lb, cap_ub = int((1 - cfg.cap_fluctuation) * avg_cap), int(
+            (1 + cfg.cap_fluctuation) * avg_cap
+        )
+        base_capacity = {j: float(rng.integers(cap_lb, cap_ub + 1)) for j in J}
 
         return cls(
             config=cfg,
@@ -240,3 +241,14 @@ class ScenarioData:
     bar_c: Dict[Tuple[int, int], float]  # combined cost \bar c_ij(ω)
     u: Dict[int, float]  # capacity u_j(ω)
     weight: float  # scenario weight (sum=1 for expectation)
+
+
+# ---- generic pickle helpers (useful for large EF objects) ----
+def save_pickle(obj: Any, path: str) -> None:
+    with open(path, "wb") as f:
+        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def load_pickle(path: str) -> Any:
+    with open(path, "rb") as f:
+        return pickle.load(f)

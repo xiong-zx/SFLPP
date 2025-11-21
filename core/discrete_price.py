@@ -7,11 +7,11 @@ the second-stage subproblems become PURE LPs (no bilinear terms!).
 Reformulation:
 --------------
 Original: Continuous prices p_i ∈ [p_min, p_max] in second stage
-          → Creates bilinear term p_i × s_i (non-convex)
+          → Creates bilinear term p_i * s_i (non-convex)
 
 Discrete: Prices p_i ∈ {price_1, ..., price_K} in FIRST stage
           → Second stage only allocates shipments (q_ij, s_i)
-          → Revenue = Σ_i p̄_i × s_i is LINEAR (p̄_i is fixed!)
+          → Revenue = Σ_i p̄_i * s_i is LINEAR (p̄_i is fixed!)
 
 First Stage:
   - x_j ∈ {0,1}: facility location decisions
@@ -60,9 +60,7 @@ class DiscretePriceConfig:
         elif self.price_spacing == "logarithmic":
             # More prices near p_min (where demand is high)
             log_prices = np.logspace(
-                np.log10(p_min),
-                np.log10(p_max),
-                self.n_price_levels
+                np.log10(p_min), np.log10(p_max), self.n_price_levels
             )
             return list(log_prices)
         else:
@@ -185,8 +183,9 @@ def solve_subproblem_discrete_lp(
     # Compute fixed prices p̄_i from ȳ
     p_bar = {}
     for i in I:
-        p_bar[i] = sum(price_levels[k] * y_bar.get((i, k), 0.0)
-                       for k in range(len(price_levels)))
+        p_bar[i] = sum(
+            price_levels[k] * y_bar.get((i, k), 0.0) for k in range(len(price_levels))
+        )
 
     # Build LP subproblem
     m = gp.Model(f"Subproblem_Discrete_LP_{scenario_idx}")
@@ -204,8 +203,7 @@ def solve_subproblem_discrete_lp(
     capacity_constrs = {}
     for j in J:
         capacity_constrs[j] = m.addConstr(
-            gp.quicksum(q[i, j] for i in I) <= u[j] * x_bar[j],
-            name=f"capacity_{j}"
+            gp.quicksum(q[i, j] for i in I) <= u[j] * x_bar[j], name=f"capacity_{j}"
         )
 
     # Demand bounds (using fixed prices p̄_i)
@@ -243,7 +241,7 @@ def solve_subproblem_discrete_lp(
             gradient_x[j] = -lambda_j * u[j]
 
         # Compute gradients w.r.t. y_i_k
-        # ∂Q/∂y_i_k = -price_k × s_i^*
+        # ∂Q/∂y_i_k = -price_k x s_i^*
         # (If we increase y_i_k, we increase price, which increases revenue)
         gradient_y = {}
         s_star = {i: s[i].X for i in I}
@@ -251,10 +249,10 @@ def solve_subproblem_discrete_lp(
         for i in I:
             for k in range(len(price_levels)):
                 # Gradient: how much does objective change if we force y_i_k = 1?
-                # Revenue term: -price_k × s_i
-                # Derivative: -price_k × (ds_i/dy_i_k) - s_i × (dprice_k/dy_i_k)
+                # Revenue term: -price_k x s_i
+                # Derivative: -price_k x (ds_i/dy_i_k) - s_i x (dprice_k/dy_i_k)
                 # Since price_k is constant and s_i is from LP solution:
-                # Simplified: -price_k × s_i (approximation for Benders cut)
+                # Simplified: -price_k x s_i (approximation for Benders cut)
                 gradient_y[(i, k)] = -price_levels[k] * s_star[i]
 
         return SubproblemResultDiscrete(
@@ -281,7 +279,9 @@ def solve_subproblem_discrete_lp(
         )
 
     else:
-        raise RuntimeError(f"LP subproblem {scenario_idx} failed with status {m.Status}")
+        raise RuntimeError(
+            f"LP subproblem {scenario_idx} failed with status {m.Status}"
+        )
 
 
 def build_benders_master_discrete(
@@ -319,8 +319,7 @@ def build_benders_master_discrete(
 
     # Constraints: exactly one price per customer
     for i in I:
-        m.addConstr(gp.quicksum(y[i, k] for k in range(K)) == 1,
-                   name=f"one_price_{i}")
+        m.addConstr(gp.quicksum(y[i, k] for k in range(K)) == 1, name=f"one_price_{i}")
 
     # At least one facility
     m.addConstr(gp.quicksum(x[j] for j in J) >= 1, name="at_least_one_facility")
@@ -338,7 +337,7 @@ def generate_benders_cut_discrete(
     """
     Generate single aggregated Benders cut from LP subproblems.
 
-    Cut: θ ≥ intercept + Σ_j coeff_x[j]×x_j + Σ_i Σ_k coeff_y[i,k]×y_i_k
+    Cut: θ ≥ intercept + Σ_j coeff_x[j]xx_j + Σ_i Σ_k coeff_y[i,k]xy_i_k
     """
     J = ext_form.J
     I = ext_form.I
@@ -354,7 +353,7 @@ def generate_benders_cut_discrete(
         weight = scenarios[result.scenario_idx].weight
         Q_val = result.objective_value
 
-        # intercept += weight × [Q(x̄,ȳ,ω) - ∇Q·(x̄,ȳ)]
+        # intercept += weight x [Q(x̄,ȳ,ω) - ∇Q·(x̄,ȳ)]
         intercept += weight * Q_val
 
         for j in J:
@@ -392,8 +391,9 @@ def add_cut_to_master_discrete(
 
     cut_expr = cut.intercept
     cut_expr += gp.quicksum(cut.coefficients_x[j] * x[j] for j in J)
-    cut_expr += gp.quicksum(cut.coefficients_y[(i, k)] * y[i, k]
-                           for i in I for k in K_range)
+    cut_expr += gp.quicksum(
+        cut.coefficients_y[(i, k)] * y[i, k] for i in I for k in K_range
+    )
 
     master_model.addConstr(theta >= cut_expr, name=f"benders_cut_{cut.iteration}")
     master_model.update()
@@ -405,7 +405,9 @@ def solve_benders_discrete_price(
     alpha: float = 0.1,
     max_iterations: int = 100,
     tolerance: float = 1e-4,
-    initial_solution: Optional[Tuple[Dict[int, float], Dict[Tuple[int, int], float]]] = None,
+    initial_solution: Optional[
+        Tuple[Dict[int, float], Dict[Tuple[int, int], float]]
+    ] = None,
     verbose: int = 1,
 ) -> Tuple[BendersDataDiscrete, gp.Model, Dict[str, Any]]:
     """
@@ -443,14 +445,14 @@ def solve_benders_discrete_price(
     K = len(price_levels)
 
     if verbose >= 1:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("DISCRETE-PRICE L-SHAPED BENDERS DECOMPOSITION")
-        print("="*70)
+        print("=" * 70)
         print(f"Instance: {len(I)} customers, {len(J)} facilities, {len(W)} scenarios")
         print(f"Price levels: {K} discrete prices from {p_min:.0f} to {p_max:.0f}")
         print(f"  {[f'{p:.1f}' for p in price_levels]}")
         print(f"Tolerance: {tolerance}")
-        print("="*70)
+        print("=" * 70)
 
     # Initialize
     benders_data = BendersDataDiscrete(
@@ -507,8 +509,7 @@ def solve_benders_discrete_price(
     # Initial upper bound
     fixed_cost_init = sum(inst.f[j] * x_init[j] for j in J)
     expected_recourse_init = sum(
-        scenarios[w].weight * initial_subproblems[w].objective_value
-        for w in W
+        scenarios[w].weight * initial_subproblems[w].objective_value for w in W
     )
     benders_data.upper_bound = fixed_cost_init + expected_recourse_init
 
@@ -556,8 +557,7 @@ def solve_benders_discrete_price(
         # Upper bound
         fixed_cost = sum(inst.f[j] * x_bar[j] for j in J)
         expected_recourse = sum(
-            scenarios[w].weight * subproblem_results[w].objective_value
-            for w in W
+            scenarios[w].weight * subproblem_results[w].objective_value for w in W
         )
         upper_bound = fixed_cost + expected_recourse
 
@@ -570,18 +570,20 @@ def solve_benders_discrete_price(
         # Log
         if verbose >= 1:
             open_fac = sum(1 for v in x_bar.values() if v > 0.5)
-            print(f"Iter {iteration:3d} | LB: {lower_bound:12.2f} | UB: {upper_bound:12.2f} | "
-                  f"Gap: {benders_data.gap:8.2%} | Facilities: {open_fac:2d} | "
-                  f"Time: {iter_time:6.2f}s")
+            print(
+                f"Iter {iteration:3d} | LB: {lower_bound:12.2f} | UB: {upper_bound:12.2f} | "
+                f"Gap: {benders_data.gap:8.2%} | Facilities: {open_fac:2d} | "
+                f"Time: {iter_time:6.2f}s"
+            )
 
         # Convergence check
         if benders_data.gap <= tolerance:
             if verbose >= 1:
-                print("="*70)
+                print("=" * 70)
                 print(f"✓ CONVERGED in {iteration + 1} iterations!")
                 print(f"Final gap: {benders_data.gap:.6f}")
                 print(f"Total time: {time.time() - start_time:.2f}s")
-                print("="*70)
+                print("=" * 70)
             break
 
         # Generate and add cut
@@ -598,10 +600,10 @@ def solve_benders_discrete_price(
 
     else:
         if verbose >= 1:
-            print("="*70)
+            print("=" * 70)
             print(f"MAX ITERATIONS ({max_iterations}) REACHED")
             print(f"Final gap: {benders_data.gap:.6f}")
             print(f"Total time: {time.time() - start_time:.2f}s")
-            print("="*70)
+            print("=" * 70)
 
     return benders_data, master_model, master_vars
