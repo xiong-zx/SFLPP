@@ -17,15 +17,24 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
+import gurobipy as gp
 import pandas as pd
 
 from core.data import Instance
 from core.extensive_form import ExtensiveForm, build_extensive_form_model
 from core.progressive_hedging import evaluate_first_stage_solution, solve_with_ph
+from core.solver import load_gurobi_params, solve_gurobi_model
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = ROOT / "config"
 DATA_DIR = ROOT / "data"
+
+
+# %% Helpers
+def apply_gurobi_defaults(params: Dict[str, float | str]) -> None:
+    """Apply defaults to the global Gurobi environment so all models inherit them."""
+    for key, val in params.items():
+        gp.setParam(key, val)
 
 
 # %% Parameters
@@ -51,7 +60,11 @@ def ef_file_path(config_name: str, instance_idx: int, n_scenarios: int) -> Path:
     return DATA_DIR / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
 
 
-def run_extensive_form(ext_form: ExtensiveForm, verbose: int = 0) -> Dict:
+def run_extensive_form(
+    ext_form: ExtensiveForm,
+    gurobi_params: Dict[str, float | str] | None = None,
+    verbose: int = 0,
+) -> Dict:
     """Run extensive form approach."""
     n_scenarios = len(ext_form.scenarios)
     inst = ext_form.instance
@@ -62,8 +75,9 @@ def run_extensive_form(ext_form: ExtensiveForm, verbose: int = 0) -> Dict:
 
     start_time = time.time()
     model, vars_dict = build_extensive_form_model(ext_form, alpha=0.1)
-    model.setParam("OutputFlag", verbose)
-    model.optimize()
+    params = dict(gurobi_params or {})
+    params.setdefault("OutputFlag", verbose)
+    solve_gurobi_model(model, params=params)
     solve_time = time.time() - start_time
 
     if model.Status == 2:  # Optimal
@@ -162,6 +176,9 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
     scenarios_list = settings.scenarios_list
     save_results = settings.save_results
 
+    gurobi_params = load_gurobi_params(CONFIG_DIR / "gurobi_params.json")
+    apply_gurobi_defaults(gurobi_params)
+
     for instance_idx in instance_list:
         inst_path = instance_file_path(config_name, instance_idx)
         if not inst_path.exists():
@@ -190,7 +207,7 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
             print(f"{'*'*70}")
 
             # 1. Extensive Form (baseline)
-            result = run_extensive_form(ext_form, verbose=0)
+            result = run_extensive_form(ext_form, gurobi_params=gurobi_params, verbose=0)
             results.append(result)
             baseline_obj = result.get("objective")
             baseline_time = result.get("time")

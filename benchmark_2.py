@@ -22,6 +22,7 @@ import gurobipy as gp
 from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.extensive_form_fixed_price import build_extensive_form_fixed_price_model
+from core.solver import load_gurobi_params, solve_gurobi_model
 from benders_first_stage_price import ProblemData, BendersDecomposition
 
 ROOT = Path(__file__).resolve().parent
@@ -60,6 +61,15 @@ def instance_file_path(config_name: str, instance_idx: int) -> Path:
 
 def ef_file_path(config_name: str, instance_idx: int, n_scenarios: int) -> Path:
     return DATA_DIR / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
+
+
+# --------------------------------------------------------------------------- #
+# Gurobi helper
+# --------------------------------------------------------------------------- #
+def apply_gurobi_defaults(params: Dict[str, float | str]) -> None:
+    """Apply default Gurobi parameters globally so all models inherit them."""
+    for key, val in params.items():
+        gp.setParam(key, val)
 
 
 # --------------------------------------------------------------------------- #
@@ -115,12 +125,18 @@ def build_problem_data_from_ext_form(ext_form: ExtensiveForm, alpha: float) -> P
     )
 
 
-def run_extensive_form(ext_form: ExtensiveForm, alpha: float, verbose: int = 0) -> Dict:
+def run_extensive_form(
+    ext_form: ExtensiveForm,
+    alpha: float,
+    verbose: int = 0,
+    gurobi_params: Dict[str, float | str] | None = None,
+) -> Dict:
     n_scenarios = len(ext_form.scenarios)
     start = time.time()
     model, vars_dict = build_extensive_form_fixed_price_model(ext_form, alpha=alpha)
-    model.setParam("OutputFlag", verbose)
-    model.optimize()
+    params = dict(gurobi_params or {})
+    params.setdefault("OutputFlag", verbose)
+    solve_gurobi_model(model, params=params)
     elapsed = time.time() - start
 
     status = model.Status
@@ -191,6 +207,9 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     scenarios_list = settings.scenarios_list
     price_levels_list = settings.price_levels_list
 
+    gurobi_params = load_gurobi_params(CONFIG_DIR / "gurobi_params.json")
+    apply_gurobi_defaults(gurobi_params)
+
     all_results: List[Dict] = []
 
     for inst_idx in instance_list:
@@ -218,7 +237,12 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
             print(f"{'*'*70}")
 
             # 1) Extensive form baseline
-            ef_res = run_extensive_form(ext_form, alpha=settings.alpha, verbose=0)
+            ef_res = run_extensive_form(
+                ext_form,
+                alpha=settings.alpha,
+                verbose=0,
+                gurobi_params=gurobi_params,
+            )
             ef_res["instance"] = inst_idx
             ef_res["config"] = config_name
             all_results.append(ef_res)
@@ -276,7 +300,7 @@ if __name__ == "__main__":
     SETTINGS = Benchmark2Settings(
         config_name="c5_f5_cf1",
         instance_idx=[1],
-        scenarios_list=[10, 20, 50],
+        scenarios_list=[10, 20, 50, 500],
         price_levels_list=[5, 10, 20, 50, 100],
         alpha=0.1,
         max_iter=50,
