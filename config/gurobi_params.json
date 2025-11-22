@@ -1,7 +1,7 @@
 {
-    "TimeLimit": 60,
+    "TimeLimit": 600,
     "MIPGap": 0.001,
     "Threads": 1,
     "OutputFlag": 1,
-    "LogToConsole": 1
+    "LogToConsole": 0
 }
