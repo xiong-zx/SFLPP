@@ -207,16 +207,18 @@ def run_comprehensive_benchmark(settings: BenchmarkSettings) -> pd.DataFrame:
             print(f"{'*'*70}")
 
             # 1. Extensive Form (baseline)
-            result = run_extensive_form(ext_form, gurobi_params=gurobi_params, verbose=0)
+            result = run_extensive_form(ext_form, gurobi_params=gurobi_params, verbose=1)
             results.append(result)
             baseline_obj = result.get("objective")
             baseline_time = result.get("time")
 
             # 2. Progressive Hedging
             # We can test a default rho value, or a list of them
-            default_rho = 1000.0
+            # default_rho = 1000.0  # Original value
+            # Try a larger rho to force convergence, or smaller to give more freedom
+            rho_to_test = 5000.0 
             result = run_progressive_hedging(
-                ext_form, rho=default_rho, max_iterations=100, verbose=0
+                ext_form, rho=rho_to_test, max_iterations=100, verbose=0
             )
             # Add comparison to baseline
             if baseline_obj and result.get("objective"):
@@ -263,7 +265,7 @@ if __name__ == "__main__":
     SETTINGS = BenchmarkSettings(
         config_name="c5_f5_cf1",
         instance_idx=[1, 2, 3],
-        scenarios_list=[10, 20],
+        scenarios_list=[10, 20, 50],
         save_results=True,
     )
     run_comprehensive_benchmark(SETTINGS)
