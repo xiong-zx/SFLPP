@@ -8,7 +8,6 @@ Loads a pre-generated instance and its sampled extensive form scenarios, then:
 Results are printed and optionally saved to results/ as CSV and JSON.
 """
 
-import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,16 +16,31 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 import gurobipy as gp
+import matplotlib.pyplot as plt
 
 from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.extensive_form_fixed_price import build_extensive_form_fixed_price_model
 from core.discrete_price_milp import build_discrete_price_milp_model
-from core.solver import load_gurobi_params, solve_gurobi_model
+from core.solver import solve_gurobi_model
 
-ROOT = Path(__file__).resolve().parent
-CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data"
+# Import utilities from the new utils module
+from utils import (
+    setup_directories,
+    instance_file_path,
+    ef_file_path,
+    load_gurobi_params,
+    apply_gurobi_defaults,
+    save_benchmark_results,
+    print_section_header,
+    print_subsection_header,
+)
+
+# Setup directories
+DIRS = setup_directories(use_dist_version=False, create=True)
+ROOT = DIRS['root']
+CONFIG_DIR = DIRS['config']
+DATA_DIR = DIRS['data']
 
 
 # --------------------------------------------------------------------------- #
@@ -49,23 +63,6 @@ class Benchmark2Settings:
             self.scenarios_list = [10, 20, 50]
         if self.price_levels_list is None:
             self.price_levels_list = [self.price_levels]
-
-
-def instance_file_path(config_name: str, instance_idx: int) -> Path:
-    return DATA_DIR / f"{config_name}_ins{instance_idx}.json"
-
-
-def ef_file_path(config_name: str, instance_idx: int, n_scenarios: int) -> Path:
-    return DATA_DIR / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
-
-
-# --------------------------------------------------------------------------- #
-# Gurobi helper
-# --------------------------------------------------------------------------- #
-def apply_gurobi_defaults(params: Dict[str, float | str]) -> None:
-    """Apply default Gurobi parameters globally so all models inherit them."""
-    for key, val in params.items():
-        gp.setParam(key, val)
 
 
 # --------------------------------------------------------------------------- #
@@ -174,6 +171,144 @@ def run_discrete_price_milp(
 
 
 # --------------------------------------------------------------------------- #
+# Plotting functions
+# --------------------------------------------------------------------------- #
+def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> None:
+    """
+    Plot gap vs number of discrete pricing levels for different scenarios.
+    """
+    # Filter only discrete price results with valid gap
+    discrete_df = df[
+        (df["method"] == "Discrete Price MILP") &
+        (df["gap_vs_continuous"].notna())
+    ].copy()
+
+    if discrete_df.empty:
+        print("No discrete price results with gap data to plot.")
+        return
+
+    scenarios_list = sorted(discrete_df["n_scenarios"].unique())
+
+    plt.figure(figsize=(10, 6))
+
+    # Use different colors and markers for each scenario count
+    colors = plt.cm.tab10(np.linspace(0, 1, len(scenarios_list)))
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
+
+    for idx, n_scen in enumerate(scenarios_list):
+        scen_df = discrete_df[discrete_df["n_scenarios"] == n_scen]
+        scen_df = scen_df.sort_values("price_levels")
+
+        plt.plot(
+            scen_df["price_levels"],
+            scen_df["gap_vs_continuous"] * 100,  # Convert to percentage
+            marker=markers[idx % len(markers)],
+            color=colors[idx],
+            label=f"S={n_scen}",
+            linewidth=2,
+            markersize=8
+        )
+
+    plt.xlabel("Number of Discrete Price Levels", fontsize=12)
+    plt.ylabel("Gap vs Continuous MIQP (%)", fontsize=12)
+    plt.title("Optimality Gap vs Number of Discrete Price Levels", fontsize=14, fontweight='bold')
+    plt.legend(title="Scenarios", fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Save plot
+    Path("results").mkdir(exist_ok=True)
+    scenarios_str = "_".join(map(str, settings.scenarios_list))
+    price_str = "_".join(map(str, settings.price_levels_list))
+    inst_str = "_".join(map(str, settings.instance_idx))
+    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_gap_vs_price_levels.png"
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"\nGap plot saved to: {plot_path}")
+    plt.close()
+
+
+def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> None:
+    """
+    Plot time complexity vs number of scenarios for different methods.
+    """
+    if df.empty:
+        print("No results to plot.")
+        return
+
+    scenarios_list = sorted(df["n_scenarios"].unique())
+
+    # Separate continuous and discrete methods
+    continuous_df = df[df["method"] == "Continuous Price MIQP"].copy()
+    discrete_df = df[df["method"] == "Discrete Price MILP"].copy()
+
+    plt.figure(figsize=(12, 7))
+
+    # Plot continuous price MIQP
+    if not continuous_df.empty:
+        continuous_df = continuous_df.sort_values("n_scenarios")
+        plt.plot(
+            continuous_df["n_scenarios"],
+            continuous_df["time"],
+            marker='o',
+            linewidth=2.5,
+            markersize=10,
+            label="Extensive Form (Continuous Price MIQP)",
+            color='black',
+            linestyle='-'
+        )
+
+    # Plot discrete price MILP for different price levels
+    if not discrete_df.empty:
+        price_levels_list = sorted(discrete_df["price_levels"].unique())
+
+        # Define colors for different price levels
+        colors = plt.cm.viridis(np.linspace(0, 0.9, len(price_levels_list)))
+        markers = ['s', '^', 'D', 'v', 'p', '*', 'h', '<', '>']
+        linestyles = ['-', '--', '-.', ':']
+
+        for idx, p_level in enumerate(price_levels_list):
+            p_df = discrete_df[discrete_df["price_levels"] == p_level]
+            p_df = p_df.sort_values("n_scenarios")
+
+            # Categorize price levels as low, medium, high
+            if p_level <= 5:
+                category = "Low"
+            elif p_level <= 10:
+                category = "Medium"
+            else:
+                category = "High"
+
+            plt.plot(
+                p_df["n_scenarios"],
+                p_df["time"],
+                marker=markers[idx % len(markers)],
+                linewidth=2,
+                markersize=8,
+                label=f"Discrete MILP (p={p_level}, {category})",
+                color=colors[idx],
+                linestyle=linestyles[idx % len(linestyles)]
+            )
+
+    plt.xlabel("Number of Scenarios", fontsize=12)
+    plt.ylabel("Time (seconds)", fontsize=12)
+    plt.title("Computational Time vs Number of Scenarios", fontsize=14, fontweight='bold')
+    plt.legend(fontsize=9, loc='best')
+    plt.grid(True, alpha=0.3)
+    plt.yscale('log')  # Use log scale for better visualization
+    plt.tight_layout()
+
+    # Save plot
+    Path("results").mkdir(exist_ok=True)
+    scenarios_str = "_".join(map(str, settings.scenarios_list))
+    price_str = "_".join(map(str, settings.price_levels_list))
+    inst_str = "_".join(map(str, settings.instance_idx))
+    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_time_vs_scenarios.png"
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"Time plot saved to: {plot_path}")
+    plt.close()
+
+
+# --------------------------------------------------------------------------- #
 # Runner
 # --------------------------------------------------------------------------- #
 def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
@@ -191,28 +326,26 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     all_results: List[Dict] = []
 
     for inst_idx in instance_list:
-        inst_path = instance_file_path(config_name, inst_idx)
+        inst_path = instance_file_path(config_name, inst_idx, DATA_DIR)
         if not inst_path.exists():
             raise FileNotFoundError(f"Instance file not found: {inst_path}")
 
-        print(f"\n{'#'*70}")
-        print(f"BENCHMARK_2 | config={config_name} | instance={inst_idx}")
-        print(f"Scenario counts: {scenarios_list} | alpha={settings.alpha} | price_levels={price_levels_list}")
-        print(f"{'#'*70}")
+        print_section_header(
+            f"BENCHMARK_2 | config={config_name} | instance={inst_idx}\n"
+            f"Scenario counts: {scenarios_list} | alpha={settings.alpha} | price_levels={price_levels_list}"
+        )
 
         # Load instance (for info only)
         inst = Instance.load_json(str(inst_path))
         print(f"Instance: {len(inst.I)} customers, {len(inst.J)} facilities")
 
         for n_scen in scenarios_list:
-            ef_path = ef_file_path(config_name, inst_idx, n_scen)
+            ef_path = ef_file_path(config_name, inst_idx, n_scen, DATA_DIR)
             if not ef_path.exists():
                 raise FileNotFoundError(f"Extensive form file not found: {ef_path}")
             ext_form = ExtensiveForm.load_pkl(str(ef_path))
 
-            print(f"\n{'*'*70}")
-            print(f"Scenarios = {n_scen}")
-            print(f"{'*'*70}")
+            print_subsection_header(f"Scenarios = {n_scen}")
 
             # 1) Continuous price MIQP baseline
             ef_res = run_extensive_form(
@@ -253,24 +386,25 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     df = pd.DataFrame(all_results)
 
     # Summary and save
-    print(f"\n{'#'*70}")
-    print("BENCHMARK_2 SUMMARY")
-    print(f"{'#'*70}\n")
+    print_section_header("BENCHMARK_2 SUMMARY")
     print(df.to_string(index=False))
 
     if settings.save_results and len(all_results) > 0:
-        Path("results").mkdir(exist_ok=True)
-        scenarios_str = "_".join(map(str, scenarios_list))
-        price_str = "_".join(map(str, price_levels_list))
-        inst_str = "_".join(map(str, instance_list))
-        base = f"{config_name}_ins{inst_str}_scenarios_{scenarios_str}_prices_{price_str}_bench2"
-        csv_path = Path("results") / f"{base}.csv"
-        json_path = Path("results") / f"{base}.json"
-        df.to_csv(csv_path, index=False)
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(all_results, f, indent=2)
-        print(f"\nResults saved to: {csv_path}")
-        print(f"Results saved to: {json_path}")
+        save_benchmark_results(
+            results=all_results,
+            config_name=config_name,
+            instance_list=instance_list,
+            scenarios_list=scenarios_list,
+            results_dir=DIRS['results'],
+            suffix='bench2',
+            price_levels_list=price_levels_list
+        )
+
+    # Generate plots
+    if len(all_results) > 0:
+        print_section_header("GENERATING PLOTS")
+        plot_gap_vs_price_levels(df, settings)
+        plot_time_vs_scenarios(df, settings)
 
     return df
 
