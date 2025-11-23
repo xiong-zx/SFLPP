@@ -97,12 +97,17 @@ class Instance:
     cap_fluctuation: float  # scenario capacity fluctuations
     base_capacity: Dict[int, float]  # base capacity for each facility j
 
+    # --- Optional visualization data ---
+    customer_coords: Optional[Dict[int, Tuple[float, float]]] = None
+    facility_coords: Optional[Dict[int, Tuple[float, float]]] = None
+
     # ---------- construction ----------
 
     @classmethod
-    def from_config(cls, cfg: Config) -> "Instance":
+    def from_config(cls, cfg: Config, use_distance_costs: bool = False) -> "Instance":
         """
         Sample first-stage parameters and distribution info from Config.
+        If use_distance_costs is True, generate coordinates and distance-based costs.
         """
         rng = np.random.default_rng(cfg.seed)
 
@@ -112,8 +117,26 @@ class Instance:
         # fixed costs
         f = {j: float(rng.uniform(cfg.f_min, cfg.f_max)) for j in J}
 
-        # base transport costs c_ij
-        c = {(i, j): float(rng.uniform(cfg.c_min, cfg.c_max)) for i in I for j in J}
+        if use_distance_costs:
+            # coordinates for visualization (assuming a 100x100 grid)
+            customer_coords = {i: (rng.uniform(0, 100), rng.uniform(0, 100)) for i in I}
+            facility_coords = {j: (rng.uniform(0, 100), rng.uniform(0, 100)) for j in J}
+
+            # base transport costs c_ij proportional to distance
+            c = {}
+            unit_cost_per_distance = 0.3  # An example factor
+            for i in I:
+                for j in J:
+                    cust_coord = customer_coords[i]
+                    fac_coord = facility_coords[j]
+                    distance = ((cust_coord[0] - fac_coord[0])**2 + (cust_coord[1] - fac_coord[1])**2)**0.5
+                    # Base cost is distance-based, plus a small random factor
+                    c[(i, j)] = float(distance * unit_cost_per_distance * rng.uniform(0.9, 1.1))
+        else:
+            customer_coords = None
+            facility_coords = None
+            # Original method: random cost independent of distance
+            c = {(i, j): float(rng.uniform(cfg.c_min, cfg.c_max)) for i in I for j in J}
 
         # base demands & linear demand parameters
         base_demand = {
@@ -157,6 +180,8 @@ class Instance:
             base_capacity_factor=cfg.base_capacity_factor,
             cap_fluctuation=cfg.cap_fluctuation,
             base_capacity=base_capacity,
+            customer_coords=customer_coords,
+            facility_coords=facility_coords,
         )
 
     # ---------- IO helpers ----------
@@ -178,6 +203,8 @@ class Instance:
             "base_capacity_factor": self.base_capacity_factor,
             "cap_fluctuation": self.cap_fluctuation,
             "base_capacity": self.base_capacity,
+            "customer_coords": self.customer_coords,
+            "facility_coords": self.facility_coords,
         }
 
         # serialize c with string keys "i,j"
@@ -199,6 +226,15 @@ class Instance:
         cap_fluctuation = float(d["cap_fluctuation"])
         base_capacity = {int(k): float(v) for k, v in d["base_capacity"].items()}
 
+        # Deserialize coordinates if they exist
+        customer_coords_raw = d.get("customer_coords")
+        customer_coords = {int(k): tuple(v) for k, v in customer_coords_raw.items()} if customer_coords_raw else None
+        facility_coords_raw = d.get("facility_coords")
+        facility_coords = {int(k): tuple(v) for k, v in facility_coords_raw.items()} if facility_coords_raw else None
+        # Handle older JSONs that might have string keys for coords
+        if customer_coords and isinstance(list(customer_coords.keys())[0], str):
+            customer_coords = {int(k): tuple(v) for k, v in customer_coords.items()}
+
         # deserialize c from "i,j"
         c_raw = d["c"]
         c: Dict[Tuple[int, int], float] = {}
@@ -219,6 +255,8 @@ class Instance:
             base_capacity_factor=base_capacity_factor,
             cap_fluctuation=cap_fluctuation,
             base_capacity=base_capacity,
+            customer_coords=customer_coords,
+            facility_coords=facility_coords,
         )
 
     def save_json(self, path: str) -> None:

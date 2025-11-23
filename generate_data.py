@@ -17,10 +17,14 @@ import numpy as np
 from core.data import Config, Instance
 from core.extensive_form import ExtensiveForm, sample_extensive_form
 
+# --- Global Switch ---
+# Set to True to use the version with distance-based costs and visualization data.
+# Set to False to use the original simple version.
+USE_DIST_VERSION = True
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data"
+DATA_DIR = ROOT / "data_dist" if USE_DIST_VERSION else ROOT / "data"
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +102,7 @@ def generate_bundle(
         for inst_idx in range(1, instances_per_config + 1):
             inst_seed = next(seeds)
             inst_cfg = replace(cfg, seed=inst_seed)
-            inst = Instance.from_config(inst_cfg)
+            inst = Instance.from_config(inst_cfg, use_distance_costs=USE_DIST_VERSION)
             inst_path = DATA_DIR / f"{instance_name(config_name, inst_idx)}.json"
             if save_instance(inst, inst_path, overwrite):
                 stats["instances"] += 1
@@ -119,11 +123,16 @@ def generate_bundle(
 if __name__ == "__main__":
     # Edit settings here as needed.
     settings = GenerationSettings(
+        # config_names=(
+        #     "c5_f5_cf1",
+        #     "c5_f10_cf1",
+        #     "c10_f5_cf1",
+        #     "c10_f10_cf1",
+        # ),
         config_names=(
-            "c5_f5_cf1",
-            "c5_f10_cf1",
-            "c10_f5_cf1",
-            "c10_f10_cf1",
+            "c10_f5_cf2",
+            "c10_f5_cf3",
+            "c10_f5_cf4",
         ),
         instances_per_config=3,
         scenarios=(10, 20, 50),

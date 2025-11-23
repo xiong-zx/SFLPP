@@ -1,0 +1,21 @@
+{
+  "config": "c5_f5_cf1",
+  "gap": 0.0009644438415738857,
+  "gurobi_params": {
+    "LogToConsole": 0,
+    "MIPGap": 0.001,
+    "OutputFlag": 1,
+    "Threads": 1,
+    "TimeLimit": 600
+  },
+  "instance_idx": 1,
+  "n_scenarios": 20,
+  "objective": -13412.001433215612,
+  "opened_facilities": [
+    2,
+    3,
+    4
+  ],
+  "solve_time": 4.593400955200195,
+  "status": 2
+}

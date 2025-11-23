@@ -16,10 +16,15 @@ from core.data import Instance
 from core.extensive_form import ExtensiveForm, build_extensive_form_model
 from core.solver import solve_gurobi_model, load_gurobi_params
 
+# --- Global Switch ---
+USE_DIST_VERSION = True
+
 ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data"
-LOG_DIR = ROOT / "log"
+DATA_DIR = ROOT / "data_dist" if USE_DIST_VERSION else ROOT / "data"
+RESULTS_DIR = ROOT / "results_dist" if USE_DIST_VERSION else ROOT / "results"
+LOG_DIR = ROOT / "log_dist" if USE_DIST_VERSION else ROOT / "log"
+RESULTS_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 MAX_WORKERS = 6
 
@@ -85,10 +90,13 @@ def run_experiment(
 # %%
 if __name__ == "__main__":
     CONFIG_NAMES: List[str] = [
-        "c5_f5_cf1",
-        "c5_f10_cf1",
-        "c10_f5_cf1",
-        "c10_f10_cf1",
+        # "c5_f5_cf1",
+        # "c5_f10_cf1",
+        # "c10_f5_cf1",
+        # "c10_f10_cf1",
+        "c10_f5_cf2",
+        "c10_f5_cf3",
+        "c10_f5_cf4",
     ]  # list of config basenames (without .json)
     INSTANCE_IDX_LIST: List[int] = [1, 2, 3]
     SCENARIOS_LIST: List[int] = [10, 20, 50]
@@ -123,9 +131,16 @@ if __name__ == "__main__":
                 cfg, inst_idx, scen = task
                 print(f"Task failed for {cfg}, ins={inst_idx}, scen={scen}: {e}")
 
-    summary_path = LOG_DIR / "summary.json"
+    # --- Save summary with a unique, descriptive name ---
+    if not all_results:
+        print("\nNo results to save.")
+    else:
+        # Use a shortened representation of config names for the filename
+        config_str = "_".join(CONFIG_NAMES)[:50] # Truncate to avoid overly long filenames
+        summary_filename = f"summary_{config_str}.json"
+        summary_path = RESULTS_DIR / summary_filename
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, sort_keys=True)
-    print(f"\nSaved summary of {len(all_results)} runs to {summary_path.name}")
+        print(f"\nSaved summary of {len(all_results)} runs to {summary_path}")
 
 # %%

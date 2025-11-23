@@ -1,0 +1,566 @@
+[
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009987182892516016,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 10,
+    "objective": -29975.676908248195,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 0.037714242935180664,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009963731062111708,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 50,
+    "objective": -29934.05523943629,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 0.32923007011413574,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.000995595690201791,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 10,
+    "objective": -20311.648772957895,
+    "opened_facilities": [
+      1,
+      2,
+      4
+    ],
+    "solve_time": 0.5846478939056396,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009863071513042348,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 10,
+    "objective": -23527.796407927075,
+    "opened_facilities": [
+      0,
+      1,
+      2
+    ],
+    "solve_time": 1.3378980159759521,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.000987559429247145,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 20,
+    "objective": -29902.16661025589,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 2.009711265563965,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009979969692025454,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 20,
+    "objective": -20400.398203436016,
+    "opened_facilities": [
+      1,
+      2,
+      4
+    ],
+    "solve_time": 2.255631923675537,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009155581288291761,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 20,
+    "objective": -23476.163331469495,
+    "opened_facilities": [
+      0,
+      1,
+      2
+    ],
+    "solve_time": 2.2030930519104004,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009985041292245845,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 50,
+    "objective": -20444.77970623731,
+    "opened_facilities": [
+      1,
+      2,
+      4
+    ],
+    "solve_time": 7.773926019668579,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf2",
+    "gap": 0.0009856865974162978,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 50,
+    "objective": -23360.52250937029,
+    "opened_facilities": [
+      0,
+      1,
+      2
+    ],
+    "solve_time": 9.989609956741333,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0009986855113061123,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 10,
+    "objective": -25982.409468595095,
+    "opened_facilities": [
+      0,
+      2,
+      3
+    ],
+    "solve_time": 20.91874098777771,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0008168784761248277,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 10,
+    "objective": -21866.311712612136,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 0.0870981216430664,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0009961137003862298,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 10,
+    "objective": -26614.063255409736,
+    "opened_facilities": [
+      0,
+      3,
+      4
+    ],
+    "solve_time": 23.136636972427368,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.00045598200789289425,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 20,
+    "objective": -21860.770304942504,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 1.3864731788635254,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0005728370633861469,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 50,
+    "objective": -21846.546702823147,
+    "opened_facilities": [
+      1,
+      2,
+      3
+    ],
+    "solve_time": 0.5020139217376709,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009999692598326904,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 10,
+    "objective": -21776.13862180227,
+    "opened_facilities": [
+      0,
+      3
+    ],
+    "solve_time": 55.04691481590271,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009986869387317715,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 50,
+    "objective": -21938.187194651975,
+    "opened_facilities": [
+      0,
+      3
+    ],
+    "solve_time": 10.12244200706482,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009402175210609978,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 10,
+    "objective": -25644.885294380416,
+    "opened_facilities": [
+      0,
+      1,
+      2
+    ],
+    "solve_time": 1.2996351718902588,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009994130095207074,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 20,
+    "objective": -21859.21405270857,
+    "opened_facilities": [
+      0,
+      3
+    ],
+    "solve_time": 70.2150309085846,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009646067928127968,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 20,
+    "objective": -25664.217571271733,
+    "opened_facilities": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "solve_time": 14.302227258682251,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009941937538866738,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 10,
+    "objective": -26188.26331990551,
+    "opened_facilities": [
+      0,
+      3,
+      4
+    ],
+    "solve_time": 11.290201663970947,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009833284217944651,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 50,
+    "objective": -25601.371840812473,
+    "opened_facilities": [
+      0,
+      1,
+      2
+    ],
+    "solve_time": 31.88976001739502,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0009995335143805123,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 20,
+    "objective": -26129.186462829253,
+    "opened_facilities": [
+      0,
+      3,
+      4
+    ],
+    "solve_time": 113.9498438835144,
+    "status": 2
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0028168172367133014,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 50,
+    "objective": -26630.456486533123,
+    "opened_facilities": [
+      0,
+      3,
+      4
+    ],
+    "solve_time": 600.0414710044861,
+    "status": 9
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0010095557042973768,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 1,
+    "n_scenarios": 20,
+    "objective": -26698.4700962295,
+    "opened_facilities": [
+      0,
+      4
+    ],
+    "solve_time": 600.0026748180389,
+    "status": 9
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0023276535301341547,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 20,
+    "objective": -26003.195169214447,
+    "opened_facilities": [
+      0,
+      2,
+      3
+    ],
+    "solve_time": 600.001601934433,
+    "status": 9
+  },
+  {
+    "config": "c10_f5_cf3",
+    "gap": 0.0044823013112530365,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 2,
+    "n_scenarios": 50,
+    "objective": -25988.61186122861,
+    "opened_facilities": [
+      0,
+      2,
+      3
+    ],
+    "solve_time": 600.0026631355286,
+    "status": 9
+  },
+  {
+    "config": "c10_f5_cf4",
+    "gap": 0.0022744685079245162,
+    "gurobi_params": {
+      "LogToConsole": 0,
+      "MIPGap": 0.001,
+      "OutputFlag": 1,
+      "Threads": 1,
+      "TimeLimit": 600
+    },
+    "instance_idx": 3,
+    "n_scenarios": 50,
+    "objective": -26276.698521145787,
+    "opened_facilities": [
+      0,
+      3,
+      4
+    ],
+    "solve_time": 600.0020248889923,
+    "status": 9
+  }
+]

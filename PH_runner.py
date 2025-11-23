@@ -14,12 +14,16 @@ from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
 
+# --- Global Switch ---
+USE_DIST_VERSION = True
+
 ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data"
-RESULTS_DIR = ROOT / "results"
-PH_LOG_DIR = ROOT / "ph_log"  # Separate log directory for PH runs
-EF_LOG_DIR = ROOT / "results"  # Directory where EF_runner.py saves its results
+DATA_DIR = ROOT / "data_dist" if USE_DIST_VERSION else ROOT / "data"
+RESULTS_DIR = ROOT / "results_dist" if USE_DIST_VERSION else ROOT / "results"
+PH_LOG_DIR = ROOT / "ph_log_dist" if USE_DIST_VERSION else ROOT / "ph_log"
+# EF_runner's logs are also separated by version
+EF_LOG_DIR = ROOT / "log_dist" if USE_DIST_VERSION else ROOT / "log"
 RESULTS_DIR.mkdir(exist_ok=True)
 PH_LOG_DIR.mkdir(exist_ok=True)
 MAX_WORKERS = 6
@@ -116,7 +120,8 @@ def load_optimal_results(summary_path: Path) -> Dict[Tuple[str, int, int], float
 # %%
 if __name__ == "__main__":
     # --- Define experiments to run ---
-    CONFIG_NAMES: List[str] = ["c5_f5_cf1", "c5_f10_cf1", "c10_f5_cf1", "c10_f10_cf1",]
+    # CONFIG_NAMES: List[str] = ["c5_f5_cf1", "c5_f10_cf1", "c10_f5_cf1", "c10_f10_cf1",]
+    CONFIG_NAMES: List[str] = ["c10_f5_cf2", "c10_f5_cf3", "c10_f5_cf4"]
     INSTANCE_IDX_LIST: List[int] = [1, 2, 3]
     SCENARIOS_LIST: List[int] = [10, 20, 50]
 
@@ -152,7 +157,13 @@ if __name__ == "__main__":
                 cfg, inst_idx, scen = task_info
                 print(f"Task failed for {cfg}, ins={inst_idx}, scen={scen}: {e}")
 
-    summary_path = RESULTS_DIR / "ph_summary.json"
+    # --- Save summary with a unique, descriptive name ---
+    if not all_results:
+        print("\nNo results to save.")
+    else:
+        config_str = "_".join(CONFIG_NAMES)[:50]
+        summary_filename = f"ph_summary_{config_str}.json"
+        summary_path = RESULTS_DIR / summary_filename
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, sort_keys=True)
-    print(f"\nSaved summary of {len(all_results)} runs to {summary_path}")
+        print(f"\nSaved summary of {len(all_results)} runs to {summary_path}")

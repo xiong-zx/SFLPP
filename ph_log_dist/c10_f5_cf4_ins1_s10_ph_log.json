@@ -1,0 +1,20 @@
+{
+  "config": "c10_f5_cf4",
+  "instance_idx": 1,
+  "iterations": 2,
+  "n_facilities": 2,
+  "n_scenarios": 10,
+  "objective": -21776.138621802274,
+  "opened_facilities": [
+    0,
+    3
+  ],
+  "ph_params": {
+    "alpha": 0.1,
+    "max_iter": 100,
+    "rho": 5000.0,
+    "tol": 0.0001
+  },
+  "solve_time": 17.74549674987793,
+  "status": "converged"
+}
