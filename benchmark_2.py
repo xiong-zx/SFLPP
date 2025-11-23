@@ -1,10 +1,9 @@
 """
-Benchmark_2: Compare Extensive Form vs. Benders (discrete prices).
+Benchmark_2: Compare Continuous Price MIQP vs. Discrete Price MILP.
 
 Loads a pre-generated instance and its sampled extensive form scenarios, then:
-  1) Solves the extensive form MIQP.
-  2) Solves the discrete-price Benders decomposition implemented in
-     benders_first_stage_price.py.
+  1) Solves the extensive form MIQP with continuous prices.
+  2) Solves the discrete-price MILP where prices are discretized into levels.
 
 Results are printed and optionally saved to results/ as CSV and JSON.
 """
@@ -22,8 +21,8 @@ import gurobipy as gp
 from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.extensive_form_fixed_price import build_extensive_form_fixed_price_model
+from core.discrete_price_milp import build_discrete_price_milp_model
 from core.solver import load_gurobi_params, solve_gurobi_model
-from benders_first_stage_price import ProblemData, BendersDecomposition
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = ROOT / "config"
@@ -39,11 +38,8 @@ class Benchmark2Settings:
     instance_idx: Optional[List[int]] = None
     scenarios_list: Optional[List[int]] = None
     alpha: float = 0.1
-    price_levels: int = 3  # kept for backward compatibility (single run)
+    price_levels: int = 10  # Number of discrete price levels for MILP
     price_levels_list: Optional[List[int]] = None
-    max_iter: int = 100
-    tol: float = 1e-4
-    verbose_benders: bool = False
     save_results: bool = True
 
     def __post_init__(self):
@@ -73,64 +69,17 @@ def apply_gurobi_defaults(params: Dict[str, float | str]) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Helpers
+# Solution methods
 # --------------------------------------------------------------------------- #
-def build_problem_data_from_ext_form(ext_form: ExtensiveForm, alpha: float) -> ProblemData:
-    """
-    Convert an ExtensiveForm object into ProblemData for the Benders solver.
-    """
-    inst = ext_form.instance
-    I, J, W = inst.I, inst.J, ext_form.W
-
-    n_customers = len(I)
-    n_facilities = len(J)
-    n_scenarios = len(W)
-
-    f = np.array([inst.f[j] for j in J])
-    c = np.zeros((n_customers, n_facilities))
-    a = np.zeros(n_customers)
-    b = np.zeros(n_customers)
-    for i_idx, i in enumerate(I):
-        a[i_idx] = inst.a[i]
-        b[i_idx] = inst.b[i]
-        for j_idx, j in enumerate(J):
-            c[i_idx, j_idx] = inst.c[(i, j)]
-
-    g = np.zeros((n_scenarios, n_customers, n_facilities))
-    u = np.zeros((n_scenarios, n_facilities))
-    pi = np.zeros(n_scenarios)
-
-    for w_idx, w in enumerate(W):
-        scen = ext_form.scenarios[w]
-        pi[w_idx] = scen.weight
-        for j_idx, j in enumerate(J):
-            u[w_idx, j_idx] = scen.u[j]
-        for i_idx, i in enumerate(I):
-            for j_idx, j in enumerate(J):
-                bar_c = scen.bar_c[(i, j)]
-                g[w_idx, i_idx, j_idx] = bar_c - inst.c[(i, j)]
-
-    return ProblemData(
-        n_customers=n_customers,
-        n_facilities=n_facilities,
-        n_scenarios=n_scenarios,
-        f=f,
-        c=c,
-        a=a,
-        b=b,
-        alpha=alpha,
-        g=g,
-        u=u,
-        pi=pi,
-    )
-
-
 def run_extensive_form(
     ext_form: ExtensiveForm,
     alpha: float,
     verbose: int = 0,
     gurobi_params: Dict[str, float | str] | None = None,
 ) -> Dict:
+    """
+    Solve the extensive form MIQP with continuous prices.
+    """
     n_scenarios = len(ext_form.scenarios)
     start = time.time()
     model, vars_dict = build_extensive_form_fixed_price_model(ext_form, alpha=alpha)
@@ -141,7 +90,7 @@ def run_extensive_form(
 
     status = model.Status
     result: Dict = {
-        "method": "Extensive Form",
+        "method": "Continuous Price MIQP",
         "status": status,
         "objective": None,
         "time": elapsed,
@@ -150,49 +99,78 @@ def run_extensive_form(
     if status == gp.GRB.OPTIMAL:
         result["objective"] = model.ObjVal
         result["n_facilities"] = sum(1 for j in ext_form.J if vars_dict["x"][j].X > 0.5)
+
+        # Print x and p values
+        print("\n--- Continuous Price MIQP Solution ---")
+        print("x (facility locations):")
+        for j in ext_form.J:
+            if vars_dict["x"][j].X > 0.5:
+                print(f"  Facility {j}: OPEN (x={vars_dict['x'][j].X:.4f})")
+
+        if "p" in vars_dict:
+            print("\np (prices per customer):")
+            for i in ext_form.I:
+                print(f"  Customer {i}: p={vars_dict['p'][i].X:.4f}")
+
     return result
 
 
-def run_benders_discrete(ext_form: ExtensiveForm, alpha: float, settings: Benchmark2Settings, price_levels: int) -> Dict:
-    pd_data = build_problem_data_from_ext_form(ext_form, alpha=alpha)
-    solver = BendersDecomposition(
-        pd_data,
-        verbose=settings.verbose_benders,
-        price_levels=price_levels,
-    )
-
+def run_discrete_price_milp(
+    ext_form: ExtensiveForm,
+    alpha: float,
+    price_levels: int,
+    verbose: int = 0,
+    gurobi_params: Dict[str, float | str] | None = None,
+) -> Dict:
+    """
+    Solve the discrete price MILP where prices are discretized into levels.
+    """
+    n_scenarios = len(ext_form.scenarios)
     start = time.time()
-    result = solver.solve(max_iter=settings.max_iter, tol=settings.tol)
+    model, vars_dict = build_discrete_price_milp_model(
+        ext_form, alpha=alpha, price_levels=price_levels
+    )
+    params = dict(gurobi_params or {})
+    params.setdefault("OutputFlag", verbose)
+    solve_gurobi_model(model, params=params)
     elapsed = time.time() - start
 
-    if result is None:
-        return {
-            "method": "Benders (discrete price)",
-            "status": "failed",
-            "objective": None,
-            "time": elapsed,
-            "gap": None,
-            "iterations": solver.iteration + 1,
-            "n_scenarios": len(ext_form.scenarios),
-        }
-
-    # Re-evaluate using served flows to make objective comparable to extensive form
-    eval_result = solver.evaluate_solution(result["x"], result["p"])
-    obj_true = eval_result.get("total_cost")
-    n_facilities = int(np.sum(result["x"] > 0.5))
-    return {
-        "method": "Benders (discrete price)",
-        "status": "ok",
-        "objective": obj_true,
-        "gap": result["gap"],
-        "iterations": result["iterations"],
+    status = model.Status
+    result: Dict = {
+        "method": "Discrete Price MILP",
+        "status": status,
+        "objective": None,
         "time": elapsed,
-        "n_facilities": n_facilities,
-        "n_scenarios": len(ext_form.scenarios),
+        "n_scenarios": n_scenarios,
         "price_levels": price_levels,
-        "expected_recourse": eval_result.get("expected_recourse"),
-        "expected_revenue": eval_result.get("expected_revenue"),
     }
+    if status == gp.GRB.OPTIMAL:
+        result["objective"] = model.ObjVal
+        result["n_facilities"] = sum(1 for j in ext_form.J if vars_dict["x"][j].X > 0.5)
+
+        # Print x and p values
+        print("\n--- Discrete Price MILP Solution ---")
+        print("x (facility locations):")
+        for j in ext_form.J:
+            if vars_dict["x"][j].X > 0.5:
+                print(f"  Facility {j}: OPEN (x={vars_dict['x'][j].X:.4f})")
+
+        if "p" in vars_dict:
+            print("\np (prices per customer):")
+            for i in ext_form.I:
+                price_val = vars_dict["p"][i].X
+                # Find which discrete level was selected
+                if "z" in vars_dict:
+                    selected_level = None
+                    for l in range(price_levels):
+                        if vars_dict["z"][i, l].X > 0.5:
+                            selected_level = l
+                            break
+                    print(f"  Customer {i}: p={price_val:.4f} (level {selected_level})")
+                else:
+                    print(f"  Customer {i}: p={price_val:.4f}")
+
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -200,7 +178,7 @@ def run_benders_discrete(ext_form: ExtensiveForm, alpha: float, settings: Benchm
 # --------------------------------------------------------------------------- #
 def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     """
-    Compare Extensive Form vs Benders (discrete price) across instances and scenario counts.
+    Compare Continuous Price MIQP vs Discrete Price MILP across instances and scenario counts.
     """
     config_name = settings.config_name
     instance_list = settings.instance_idx
@@ -236,7 +214,7 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
             print(f"Scenarios = {n_scen}")
             print(f"{'*'*70}")
 
-            # 1) Extensive form baseline
+            # 1) Continuous price MIQP baseline
             ef_res = run_extensive_form(
                 ext_form,
                 alpha=settings.alpha,
@@ -246,29 +224,30 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
             ef_res["instance"] = inst_idx
             ef_res["config"] = config_name
             all_results.append(ef_res)
-            print(f"[Extensive] status={ef_res['status']} obj={ef_res['objective']} time={ef_res['time']:.2f}s")
+            print(f"[Continuous Price MIQP] status={ef_res['status']} obj={ef_res['objective']} time={ef_res['time']:.2f}s")
 
-            # 2) Benders with discrete prices (sweep price levels)
+            # 2) Discrete price MILP (sweep price levels)
             for p_levels in price_levels_list:
-                benders_res = run_benders_discrete(
-                    ext_form, alpha=settings.alpha, settings=settings, price_levels=p_levels
+                discrete_res = run_discrete_price_milp(
+                    ext_form,
+                    alpha=settings.alpha,
+                    price_levels=p_levels,
+                    verbose=0,
+                    gurobi_params=gurobi_params,
                 )
-                benders_res["instance"] = inst_idx
-                benders_res["config"] = config_name
-                benders_res["price_levels"] = p_levels
+                discrete_res["instance"] = inst_idx
+                discrete_res["config"] = config_name
 
-                if ef_res.get("objective") is not None and benders_res.get("objective") is not None:
-                    opt = ef_res["objective"]
-                    bnd = benders_res["objective"]
-                    benders_res["gap_vs_extensive"] = (bnd - opt) / abs(opt) if abs(opt) > 1e-8 else None
+                if ef_res.get("objective") is not None and discrete_res.get("objective") is not None:
+                    continuous_obj = ef_res["objective"]
+                    discrete_obj = discrete_res["objective"]
+                    discrete_res["gap_vs_continuous"] = (discrete_obj - continuous_obj) / abs(continuous_obj) if abs(continuous_obj) > 1e-8 else None
 
-                all_results.append(benders_res)
+                all_results.append(discrete_res)
                 print(
-                    f"[Benders ] levels={p_levels} status={benders_res['status']} obj={benders_res['objective']} "
-                    f"gap={benders_res.get('gap')} time={benders_res['time']:.2f}s "
-                    f"iters={benders_res.get('iterations')} "
-                    f"recourse={benders_res.get('expected_recourse')} "
-                    f"revenue={benders_res.get('expected_revenue')}"
+                    f"[Discrete Price MILP ] levels={p_levels} status={discrete_res['status']} "
+                    f"obj={discrete_res['objective']} time={discrete_res['time']:.2f}s "
+                    f"gap_vs_continuous={discrete_res.get('gap_vs_continuous')}"
                 )
 
     df = pd.DataFrame(all_results)
@@ -300,12 +279,9 @@ if __name__ == "__main__":
     SETTINGS = Benchmark2Settings(
         config_name="c5_f5_cf1",
         instance_idx=[1],
-        scenarios_list=[10, 20, 50, 500],
-        price_levels_list=[5, 10, 20, 50, 100],
+        scenarios_list=[10, 20, 50, 100, 200],
+        price_levels_list=[3, 5, 8, 10, 15],
         alpha=0.1,
-        max_iter=50,
-        tol=1e-4,
-        verbose_benders=False,
         save_results=True,
     )
     run_benchmark(SETTINGS)

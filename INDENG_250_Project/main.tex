@@ -71,177 +71,258 @@ The company can adjust the selling price of its goods to mitigate the impact of 
 Since there will be no demand if $p_i > \frac{b_i}{a_i}$, in which case making any goods tailored to customer $i$ will be non-profitable. We can restrict our model in the case $0 \leq p_i \leq \frac{b_i}{a_i}$. 
 
 Sometimes, it can be impractical to decide price in different scenarios.
-\subsection{Model with First-Stage Prices}
 
-We now treat the prices $\{p_i\}_{i \in I}$ as decisions that are common across all scenarios. Let $\Omega$ be the finite set of scenarios with probabilities $\pi_\omega$, $\omega \in \Omega$. We use expectation as the risk measure here.
+\subsection{Model with Discretized First-Stage Price Strategies}
+\label{sec:model-firststage-discrete}
 
-The two-stage stochastic program with first-stage prices is:
-\begin{subequations}\label{eq:model-firststage-prices}
-\begin{align}
-    \min_{x,p} \quad 
-    & \sum_{j \in J} f_j x_j 
-      + \sum_{\omega \in \Omega} \pi_\omega \, Q(x,p;\xi^\omega) \label{eq:master-objective-firststage}\\[2pt]
-    \text{s.t.} \quad
-    & 0 \le p_i \le \frac{b_i}{a_i}, && \forall i \in I, \label{eq:price-bounds-firststage}\\
-    & x_j \in \{0,1\}, && \forall j \in J. \label{eq:x-binary-firststage}
-\end{align}
-\end{subequations}
+The difficulty with the continuous-price formulation in the previous subsection is that prices $p_i$ and shipment quantities $q_{ij}^\omega$
+enter the second-stage problem in a coupled, nonlinear way through the
+demand function $h_i(p_i) = [b_i - a_i p_i]_+$. To restore a structure
+that is well suited for Benders decomposition, we approximate the
+continuous price range of each customer by a finite set of candidate
+price levels and treat the choice among these levels as a discrete
+first-stage decision.
 
-Given a first-stage decision $(x,p)$ and a scenario 
-$\xi^\omega = \big(\{g_{ij}^\omega\}_{i,j}, \{u_j^\omega\}_{j}\big)$, the second-stage (recourse) problem is
-\begin{subequations}\label{eq:second-stage-firststage}
-\begin{align}
-    Q(x,p;\xi^\omega) 
-    = \min_{q^\omega} \quad 
-    & \sum_{i \in I} \sum_{j \in J} 
-      \big(c_{ij} + g_{ij}^\omega - p_i\big) \, q_{ij}^\omega \label{eq:sub-objective-firststage}\\
-    \text{s.t.} \quad
-    & \sum_{j \in J} q_{ij}^\omega 
-      \;\ge\; (1-\alpha)\, h_i(p_i)
-      = (1-\alpha)\big(b_i - a_i p_i\big),
-      && \forall i \in I, \label{eq:sub-lb-demand-firststage}\\
-    & \sum_{j \in J} q_{ij}^\omega 
-      \;\le\; h_i(p_i)
-      = b_i - a_i p_i,
-      && \forall i \in I, \label{eq:sub-ub-demand-firststage}\\
-    & \sum_{i \in I} q_{ij}^\omega 
-      \;\le\; u_j^\omega x_j,
-      && \forall j \in J, \label{eq:sub-capacity-firststage}\\
-    & q_{ij}^\omega \ge 0,
-      && \forall i \in I,\; \forall j \in J. \label{eq:sub-nonneg-firststage}
-\end{align}
-\end{subequations}
-
-Note that for fixed $(x,p)$ and $\omega \in \Omega$, the recourse problem
-\eqref{eq:second-stage-firststage} is a linear program in $q^\omega$.
-
-\subsection{Benders Decomposition}
-
-Benders decomposition exploits the fact that the recourse LP depends on the first-stage decisions $(x,p)$ only through the right-hand side (demand and capacity) and the objective coefficients, while the feasible set in the dual does not depend on $(x,p)$.
-
-\subsubsection{Subproblem and Dual}
-
-For a fixed $(x,p)$ and scenario $\omega$, the second-stage problem
-\eqref{eq:second-stage-firststage} can be written as
-\begin{equation*}
-\begin{aligned}
-\min_{q^\omega} \quad 
-& \sum_{i\in I}\sum_{j\in J} d_{ij}^\omega(p)\, q_{ij}^\omega \\
-\text{s.t.} \quad
-& \sum_{j \in J} q_{ij}^\omega \;\ge\; (1-\alpha)\big(b_i - a_i p_i\big), && \forall i \in I,\\
-& \sum_{j \in J} q_{ij}^\omega \;\le\; b_i - a_i p_i, && \forall i \in I,\\
-& \sum_{i \in I} q_{ij}^\omega \;\le\; u_j^\omega x_j, && \forall j \in J,\\
-& q_{ij}^\omega \ge 0, && \forall i \in I,\; \forall j \in J,
-\end{aligned}
-\end{equation*}
-where
+For each customer $i \in I$, let $K_i$ denote a finite index set of
+candidate price levels, and let
 \[
-d_{ij}^\omega(p) := c_{ij} + g_{ij}^\omega - p_i.
+    \bar p_{ik} \in \Big[0,\frac{b_i}{a_i}\Big], 
+    \qquad k \in K_i,
 \]
+be the corresponding (deterministic) prices. For convenience, define the
+associated deterministic demand levels
+\[
+    d_{ik} := h_i(\bar p_{ik})
+    = \big[b_i - a_i \bar p_{ik}\big]_+,
+    \qquad i \in I,\; k \in K_i.
+\]
+We assume that the grid $\{\bar p_{ik}\}_{k \in K_i}$ is chosen so that
+$d_{ik} \ge 0$ for all $i,k$ of interest.
 
-Let the dual variables be:
-\begin{itemize}
-    \item $\lambda_i^\omega \ge 0$ for the demand lower bounds,
-    \item $\mu_i^\omega \ge 0$ for the negated demand upper bounds,
-    \item $\nu_j^\omega \ge 0$ for the negated capacity constraints.
-\end{itemize}
-The dual of the second-stage LP is then
-\begin{subequations}\label{eq:dual-subproblem-firststage}
-\begin{align}
-    Q(x,p;\xi^\omega)
-    = \max_{\lambda^\omega,\mu^\omega,\nu^\omega \ge 0} \quad
-    & \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\lambda_i^\omega
-      - \sum_{i \in I}\big(b_i - a_i p_i\big)\mu_i^\omega
-      - \sum_{j \in J} u_j^\omega x_j \nu_j^\omega \label{eq:dual-obj-firststage}\\
-    \text{s.t.} \quad
-    & \lambda_i^\omega - \mu_i^\omega - \nu_j^\omega
-      \;\le\; c_{ij} + g_{ij}^\omega - p_i,
-      \quad \forall i \in I,\; \forall j \in J. \label{eq:dual-constraints-firststage}
-\end{align}
-\end{subequations}
-
-Observe that the dual feasible region defined by
-\eqref{eq:dual-constraints-firststage} does not depend on $(x,p)$; only the
-dual objective \eqref{eq:dual-obj-firststage} depends on $(x,p)$. Therefore,
-the recourse function $Q(x,p;\xi^\omega)$ is the pointwise maximum of affine
-functions in $(x,p)$ and is hence convex and piecewise linear.
-
-\subsubsection{Master Problem with Benders Cuts}
-
-We introduce auxiliary variables $\theta_\omega$ to represent the recourse
-cost in each scenario and formulate the Benders master problem in a
-multi-cut form:
-\begin{subequations}\label{eq:benders-master-firststage}
-\begin{align}
-    \min_{x,p,\theta} \quad
-    & \sum_{j \in J} f_j x_j 
-      + \sum_{\omega \in \Omega} \pi_\omega \theta_\omega \label{eq:benders-master-obj-firststage}\\
-    \text{s.t.} \quad
-    & 0 \le p_i \le \frac{b_i}{a_i}, && \forall i \in I, \label{eq:benders-price-bounds-firststage}\\
-    & x_j \in \{0,1\}, && \forall j \in J, \label{eq:benders-x-binary-firststage}\\
-    & \theta_\omega \;\ge\; B^\omega_k(x,p), && \forall \omega \in \Omega,\; \forall k \in \mathcal{K}_\omega. \label{eq:benders-cuts-firststage}
-\end{align}
-\end{subequations}
-Here, $\mathcal{K}_\omega$ is the index set of Benders cuts accumulated for
-scenario $\omega$. Each cut is derived from an optimal dual solution
-$(\bar\lambda^{\omega k},\bar\mu^{\omega k},\bar\nu^{\omega k})$ of
-\eqref{eq:dual-subproblem-firststage}, evaluated at some incumbent
-first-stage solution $(\bar x^{k},\bar p^{k})$, and has the form
+\paragraph{First-stage decisions.}
+In addition to the facility-opening variables $x_j$, we introduce binary
+variables $y_{ik}$ indicating the selected price level for each
+customer:
+\[
+    y_{ik} =
+    \begin{cases}
+        1, & \text{if customer $i$ is offered price } \bar p_{ik},\\
+        0, & \text{otherwise.}
+    \end{cases}
+\]
+We enforce the selection of exactly one price level per customer via
 \begin{equation}
-\label{eq:benders-cut-expression-firststage}
-\begin{aligned}
-B^\omega_k(x,p)
-:=\;& \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\, \bar\lambda_{i}^{\omega k}
- - \sum_{i \in I} \big(b_i - a_i p_i\big)\, \bar\mu_{i}^{\omega k}
- - \sum_{j \in J} u_j^\omega x_j \, \bar\nu_{j}^{\omega k}.
-\end{aligned}
+\label{eq:price-selection-constraints}
+    \sum_{k \in K_i} y_{ik} = 1,
+    \qquad \forall i \in I.
+\end{equation}
+The realized price for customer $i$ can then be written as the linear
+expression
+\begin{equation}
+\label{eq:price-from-y}
+    p_i(y) 
+    := \sum_{k \in K_i} \bar p_{ik} y_{ik},
+    \qquad \forall i \in I,
+\end{equation}
+and the corresponding deterministic demand level becomes
+\begin{equation}
+\label{eq:demand-from-y}
+    H_i(y) 
+    := \sum_{k \in K_i} d_{ik} y_{ik},
+    \qquad \forall i \in I.
 \end{equation}
 
-Intuitively, each inequality \eqref{eq:benders-cuts-firststage} enforces that
-the master problem's estimate $\theta_\omega$ of the scenario recourse cost
-is at least as large as one of the supporting hyperplanes of the true
-recourse function $Q(x,p;\xi^\omega)$.
+Let $\Omega$ be the finite set of scenarios with probabilities
+$\pi_\omega$, $\omega \in \Omega$. Using the discretized price
+representation, the two-stage stochastic program reads
+\begin{subequations}\label{eq:model-firststage-discrete}
+\begin{align}
+    \min_{x,y} \quad 
+    & \sum_{j \in J} f_j x_j 
+      + \sum_{\omega \in \Omega} \pi_\omega \, Q(x,y;\xi^\omega)
+      \label{eq:master-objective-firststage-discrete} \\[2pt]
+    \text{s.t.} \quad
+    & \sum_{k \in K_i} y_{ik} = 1,
+      && \forall i \in I, \label{eq:master-y-simplex}\\
+    & x_j \in \{0,1\}, 
+      && \forall j \in J, \label{eq:master-x-binary}\\
+    & y_{ik} \in \{0,1\},
+      && \forall i \in I,\; \forall k \in K_i. 
+      \label{eq:master-y-binary}
+\end{align}
+\end{subequations}
 
-\subsubsection{Benders Algorithm}
+\paragraph{Second-stage (recourse) problem.}
+Given first-stage decisions $(x,y)$ and a scenario
+$\xi^\omega = \big(\{g_{ij}^\omega\}_{i,j}, \{u_j^\omega\}_{j}\big)$, the
+second-stage decisions consist of the shipment quantities
+$q_{ij}^\omega \ge 0$. Substituting \eqref{eq:price-from-y} and
+\eqref{eq:demand-from-y} into the original recourse problem, we obtain
+\begin{subequations}\label{eq:second-stage-firststage-discrete}
+\begin{align}
+    Q(x,y;\xi^\omega) 
+    = \min_{q^\omega} \quad 
+    & \sum_{i \in I} \sum_{j \in J} 
+      \big(c_{ij} + g_{ij}^\omega - p_i(y)\big) \, q_{ij}^\omega
+      \label{eq:sub-objective-firststage-discrete}\\
+    \text{s.t.} \quad
+    & \sum_{j \in J} q_{ij}^\omega 
+      \;\ge\; (1-\alpha)\, H_i(y)
+      = (1-\alpha) \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I, \label{eq:sub-lb-demand-firststage-discrete}\\
+    & \sum_{j \in J} q_{ij}^\omega 
+      \;\le\; H_i(y)
+      = \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I, \label{eq:sub-ub-demand-firststage-discrete}\\
+    & \sum_{i \in I} q_{ij}^\omega 
+      \;\le\; u_j^\omega x_j,
+      && \forall j \in J, \label{eq:sub-capacity-firststage-discrete}\\
+    & q_{ij}^\omega \ge 0,
+      && \forall i \in I,\; \forall j \in J. 
+      \label{eq:sub-nonneg-firststage-discrete}
+\end{align}
+\end{subequations}
 
-The Benders decomposition algorithm proceeds iteratively as follows:
-\begin{enumerate}
-    \item \textbf{Master step.} Solve the master problem
-    \eqref{eq:benders-master-firststage} to obtain a candidate solution
-    $(x^{(t)},p^{(t)},\theta^{(t)})$.
-    \item \textbf{Subproblem step.} For each scenario $\omega \in \Omega$,
-    solve the second-stage LP \eqref{eq:second-stage-firststage} (or its
-    dual \eqref{eq:dual-subproblem-firststage}) with $(x^{(t)},p^{(t)})$
-    fixed, obtaining the optimal value $Q(x^{(t)},p^{(t)};\xi^\omega)$ and
-    an optimal dual solution
-    $(\bar\lambda^{\omega t},\bar\mu^{\omega t},\bar\nu^{\omega t})$.
-    \item \textbf{Cut generation.} For each $\omega \in \Omega$, if
-    $\theta_\omega^{(t)} < Q(x^{(t)},p^{(t)};\xi^\omega)$ (up to tolerance),
-    add the Benders cut
-    \[
-        \theta_\omega \;\ge\;
-        \sum_{i \in I} (1-\alpha)\big(b_i - a_i p_i\big)\, \bar\lambda_{i}^{\omega t}
-        - \sum_{i \in I} \big(b_i - a_i p_i\big)\, \bar\mu_{i}^{\omega t}
-        - \sum_{j \in J} u_j^\omega x_j \, \bar\nu_{j}^{\omega t}
-    \]
-    of the form \eqref{eq:benders-cut-expression-firststage} to the master
-    problem.
-    \item \textbf{Convergence check.} Compute a lower bound from the master
-    problem and an upper bound from the evaluated objective
-    \[
-        \sum_{j \in J} f_j x_j^{(t)} 
-        + \sum_{\omega \in \Omega} \pi_\omega
-          Q(x^{(t)},p^{(t)};\xi^\omega).
-    \]
-    If the optimality gap between these bounds is within a prescribed
-    tolerance, terminate; otherwise, return to Step~1 with the enriched
-    master problem.
-\end{enumerate}
+Note that for fixed $(x,y)$ and $\omega \in \Omega$, the recourse problem
+\eqref{eq:second-stage-firststage-discrete} is a linear program in
+$q^\omega$. The dependence on the first-stage decisions enters only
+through the right-hand sides of the demand and capacity constraints and
+through the objective coefficients via $p_i(y)$. Consequently, the dual
+feasible region of the recourse problem does not depend on $(x,y)$, and
+the recourse function $Q(x,y;\xi^\omega)$ is again the pointwise maximum
+of affine functions of $(x,y)$. This restores the usual structure needed
+for a Benders decomposition in the joint space of facility-opening
+decisions $x$ and discretized price decisions $y$.
 
-This decomposition exploits the linear structure of the recourse problems
-and yields a sequence of increasingly accurate polyhedral approximations of
-the expected recourse function in the space of first-stage decisions
-$(x,p)$.
+\paragraph{Extensive form MILP reformulation.}
+For computational benchmarking and solution validation, it is useful to
+write out the full extensive form of the discretized model
+\eqref{eq:model-firststage-discrete}. By expanding the expectation over
+scenarios and incorporating all second-stage constraints directly, we
+obtain a single large optimization problem. However, a key challenge arises
+in the objective function: the revenue term contains a \emph{bilinear}
+product between the price variable $p_i(y)$ (which depends on the
+first-stage binary decisions $y_{ik}$) and the second-stage shipment
+quantity $q_{ij}^\omega$.
+
+To obtain a pure mixed-integer linear program (MILP), we must linearize
+this bilinear term. We achieve this via a McCormick envelope (big-$M$)
+reformulation.
+
+\subparagraph{Extensive form with bilinear revenue term.}
+Substituting the second-stage recourse problem into the master problem,
+the extensive form reads
+\begin{align*}
+    \min_{x,y,q} \quad
+    & \sum_{j \in J} f_j x_j
+      + \sum_{\omega \in \Omega} \pi_\omega \sum_{i \in I} \sum_{j \in J}
+      \Big( \bar c_{ij}^\omega \, q_{ij}^\omega
+      - p_i(y) \, q_{ij}^\omega \Big) \\
+    \text{s.t.} \quad
+    & \sum_{k \in K_i} y_{ik} = 1,
+      && \forall i \in I, \\
+    & \sum_{j \in J} q_{ij}^\omega
+      \;\ge\; (1-\alpha) \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I,\; \forall \omega \in \Omega, \\
+    & \sum_{j \in J} q_{ij}^\omega
+      \;\le\; \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I,\; \forall \omega \in \Omega, \\
+    & \sum_{i \in I} q_{ij}^\omega
+      \;\le\; u_j^\omega x_j,
+      && \forall j \in J,\; \forall \omega \in \Omega, \\
+    & x_j \in \{0,1\},
+      && \forall j \in J, \\
+    & y_{ik} \in \{0,1\},
+      && \forall i \in I,\; \forall k \in K_i, \\
+    & q_{ij}^\omega \ge 0,
+      && \forall i \in I,\; \forall j \in J,\; \forall \omega \in \Omega.
+\end{align*}
+The revenue term $-p_i(y) \, q_{ij}^\omega$ is bilinear because
+\[
+    p_i(y) \, q_{ij}^\omega
+    = \Big(\sum_{k \in K_i} \bar p_{ik} y_{ik}\Big) q_{ij}^\omega
+    = \sum_{k \in K_i} \bar p_{ik} \, y_{ik} \, q_{ij}^\omega,
+\]
+where each term $y_{ik} \, q_{ij}^\omega$ is a product of a binary
+variable and a continuous variable.
+
+\subparagraph{Linearization via McCormick envelope.}
+To linearize each bilinear term $y_{ik} \, q_{ij}^\omega$, we introduce
+auxiliary continuous variables
+\[
+    r_{ijk}^\omega \;\text{representing}\; y_{ik} \, q_{ij}^\omega,
+    \qquad i \in I,\; j \in J,\; k \in K_i,\; \omega \in \Omega.
+\]
+Let $M$ denote an upper bound on $q_{ij}^\omega$ (e.g., $M = \max_{i \in I} b_i$).
+The McCormick envelope constraints enforcing $r_{ijk}^\omega = y_{ik} \, q_{ij}^\omega$
+are:
+\begin{subequations}\label{eq:mccormick-linearization}
+\begin{align}
+    r_{ijk}^\omega &\le M \, y_{ik},
+      && \forall i,j,k,\omega, \label{eq:mccormick-1}\\
+    r_{ijk}^\omega &\le q_{ij}^\omega,
+      && \forall i,j,k,\omega, \label{eq:mccormick-2}\\
+    r_{ijk}^\omega &\ge q_{ij}^\omega - M(1 - y_{ik}),
+      && \forall i,j,k,\omega. \label{eq:mccormick-3}
+\end{align}
+\end{subequations}
+When $y_{ik} = 0$, constraints \eqref{eq:mccormick-1} and
+\eqref{eq:mccormick-3} force $r_{ijk}^\omega = 0$. When $y_{ik} = 1$,
+constraints \eqref{eq:mccormick-2} and \eqref{eq:mccormick-3} together
+force $r_{ijk}^\omega = q_{ij}^\omega$, as desired.
+
+Substituting $r_{ijk}^\omega$ for $y_{ik} \, q_{ij}^\omega$, the revenue
+term becomes
+\[
+    - \sum_{\omega \in \Omega} \pi_\omega \sum_{i \in I} \sum_{j \in J}
+      p_i(y) \, q_{ij}^\omega
+    = - \sum_{\omega \in \Omega} \pi_\omega \sum_{i \in I} \sum_{j \in J}
+      \sum_{k \in K_i} \bar p_{ik} \, r_{ijk}^\omega,
+\]
+which is now \emph{linear} in the variables $(y, q, r)$.
+
+\subparagraph{Final MILP formulation.}
+Combining all components, the complete extensive form MILP is
+\begin{subequations}\label{eq:extensive-form-milp}
+\begin{align}
+    \min_{x,y,q,r} \quad
+    & \sum_{j \in J} f_j x_j
+      + \sum_{\omega \in \Omega} \pi_\omega \sum_{i \in I} \sum_{j \in J}
+      \Big( \bar c_{ij}^\omega \, q_{ij}^\omega
+      - \sum_{k \in K_i} \bar p_{ik} \, r_{ijk}^\omega \Big)
+      \label{eq:milp-obj}\\
+    \text{s.t.} \quad
+    & \sum_{k \in K_i} y_{ik} = 1,
+      && \forall i \in I, \label{eq:milp-y-select}\\
+    & \sum_{j \in J} q_{ij}^\omega
+      \;\ge\; (1-\alpha) \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I,\; \forall \omega \in \Omega, \label{eq:milp-demand-lb}\\
+    & \sum_{j \in J} q_{ij}^\omega
+      \;\le\; \sum_{k \in K_i} d_{ik} y_{ik},
+      && \forall i \in I,\; \forall \omega \in \Omega, \label{eq:milp-demand-ub}\\
+    & \sum_{i \in I} q_{ij}^\omega
+      \;\le\; u_j^\omega x_j,
+      && \forall j \in J,\; \forall \omega \in \Omega, \label{eq:milp-capacity}\\
+    & r_{ijk}^\omega \le M \, y_{ik},
+      && \forall i,j,k,\omega, \label{eq:milp-mccormick-1}\\
+    & r_{ijk}^\omega \le q_{ij}^\omega,
+      && \forall i,j,k,\omega, \label{eq:milp-mccormick-2}\\
+    & r_{ijk}^\omega \ge q_{ij}^\omega - M(1 - y_{ik}),
+      && \forall i,j,k,\omega, \label{eq:milp-mccormick-3}\\
+    & x_j \in \{0,1\},
+      && \forall j \in J, \label{eq:milp-x-binary}\\
+    & y_{ik} \in \{0,1\},
+      && \forall i \in I,\; \forall k \in K_i, \label{eq:milp-y-binary}\\
+    & q_{ij}^\omega \ge 0,
+      && \forall i,j,\omega, \label{eq:milp-q-nonneg}\\
+    & r_{ijk}^\omega \ge 0,
+      && \forall i,j,k,\omega. \label{eq:milp-r-nonneg}
+\end{align}
+\end{subequations}
+This formulation is a pure MILP with $|J| + \sum_{i} |K_i|$ binary variables
+and can be solved directly by commercial MILP solvers such as Gurobi or CPLEX.
+The quality of the big-$M$ bound directly affects the LP relaxation: tighter
+bounds yield stronger relaxations and faster solution times.
 
 \section{Potential Extension}
 \paragraph{Algorithm}
@@ -250,6 +331,62 @@ $(x,p)$.
     \item progressive hedging \cindynote{to do}
     \item Mccormick envelope linearization + standard benders \samnote{to do}
 \end{enumerate}
+
+
+
+\begin{algorithm}[H]
+\caption{Progressive Hedging for the Stochastic Facility Location and Pricing Problem}
+\label{alg:PH_facility_pricing}
+\begin{algorithmic}[1]
+\State \textbf{Input:} scenario set $\Omega$, probabilities $p_\omega$, penalty parameter $\rho>0$.
+\State \textbf{Initialization:}
+\State \quad Set iteration counter $k \gets 0$.
+\State \quad Initialize multipliers $u^{\omega,0}_j \gets 0$ for all $j\in J$, $\omega\in\Omega$.
+\State \quad Choose an initial feasible solution $x^{\omega,0}_j \in \{0,1\}$ for all $j\in J$, $\omega\in\Omega$.
+\State \quad Compute initial consensus (nonanticipative) first-stage decision
+\[
+    \bar x_j^0 \gets \sum_{\omega\in\Omega} p_\omega x_j^{\omega,0}, \quad \forall j\in J.
+\]
+
+\Repeat
+    \State $k \gets k+1$.
+    \For{each scenario $\omega \in \Omega$}
+        \State Solve the following scenario subproblem:
+        \begin{align*}
+            \min_{x^\omega,\,p^\omega,\,q^\omega} \quad
+            & \sum_{j\in J} f_j x_j^\omega
+              - \sum_{i\in I}\sum_{j\in J} \big(p_i^\omega - \bar c_{ij}^\omega\big) q_{ij}^\omega \\
+            & \quad + \sum_{j\in J} u_{j}^{\omega,k-1} x_j^\omega
+              + \frac{\rho}{2} \sum_{j\in J} \big(x_j^\omega - \bar x_j^{k-1}\big)^2 \\
+            \text{s.t.} \quad
+            & \sum_{j\in J} q_{ij}^\omega \;\ge\; (1-\alpha)\,h_i(p_i^\omega), && \forall i\in I, \\
+            & \sum_{j\in J} q_{ij}^\omega \;\le\; h_i(p_i^\omega), && \forall i\in I, \\
+            & \sum_{i\in I} q_{ij}^\omega \;\le\; u_j^\omega x_j^\omega, && \forall j\in J, \\
+            & q_{ij}^\omega \;\ge\; 0, && \forall i\in I, \forall j\in J, \\
+            & 0 \;\le\; p_i^\omega \;\le\; \frac{b_i}{a_i}, && \forall i\in I, \\
+            & x_j^\omega \in \{0,1\}, && \forall j\in J.
+        \end{align*}
+        \State Denote the optimal solution by $(x^{\omega,k}, p^{\omega,k}, q^{\omega,k})$.
+    \EndFor
+    \State Update the consensus first-stage decision:
+    \[
+        \bar x_j^{k} \gets \sum_{\omega\in\Omega} p_\omega x_j^{\omega,k},
+        \quad \forall j\in J.
+    \]
+    \State Update the multipliers for the nonanticipativity constraints:
+    \[
+        u_j^{\omega,k} \gets u_j^{\omega,k-1}
+        + \rho \big(x_j^{\omega,k} - \bar x_j^{k}\big),
+        \quad \forall j\in J,\ \forall \omega\in\Omega.
+    \]
+\Until{a stopping criterion is satisfied (e.g.,
+$\max_{\omega\in\Omega,\,j\in J} |x_j^{\omega,k} - \bar x_j^k| \le \varepsilon$)}
+\State \textbf{Output:} nonanticipative first-stage solution
+$\hat x_j \gets \bar x_j^{k}$, $\forall j\in J$, and corresponding second-stage policies $(p^{\omega,k}, q^{\omega,k})$.
+\end{algorithmic}
+\end{algorithm}
+
+
 
 \paragraph{Model and data}
 \michaelnote{to do}
