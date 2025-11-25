@@ -1,0 +1,29 @@
+{
+  "config_name": "c20_f5_cf1",
+  "instance_idx": 1,
+  "n_scenarios": 10,
+  "tau_levels": [
+    0.05,
+    0.2,
+    0.4,
+    0.8,
+    1.2
+  ],
+  "local_radius": 10.0,
+  "x_boundary": 40.0,
+  "y_boundary": 40.0,
+  "use_y_boundary": false,
+  "war_regions": [
+    "A",
+    "B"
+  ],
+  "base_tau_min": 0.0,
+  "base_tau_max": 0.1,
+  "favor_region": "A",
+  "favor_region_factor": 0.2,
+  "other_region_factor": 3,
+  "favor_region_demand_factor": 0.3,
+  "use_dist_version": true,
+  "baseline_suffix": null,
+  "seed": 42
+}

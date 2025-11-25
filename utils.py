@@ -251,7 +251,7 @@ def save_dataframe_results(
     df: pd.DataFrame,
     base_path: Path | str,
     save_csv: bool = True,
-    save_json: bool = True,
+    save_json_flag: bool = True,
     results_list: Optional[List[Dict]] = None
 ) -> Tuple[Optional[Path], Optional[Path]]:
     """
@@ -278,7 +278,7 @@ def save_dataframe_results(
         df.to_csv(csv_path, index=False)
         print(f"Results saved to: {csv_path}")
 
-    if save_json:
+    if save_json_flag:
         json_path = base_path.with_suffix('.json')
         data = results_list if results_list is not None else df.to_dict(orient='records')
         save_json(data, json_path, indent=2)
@@ -368,7 +368,7 @@ def save_benchmark_results(
     df = pd.DataFrame(results)
     base_path = results_dir / filename
 
-    return save_dataframe_results(df, base_path, save_csv=True, save_json=True, results_list=results)
+    return save_dataframe_results(df, base_path, save_csv=True, save_json_flag=True, results_list=results)
 
 
 def load_optimal_results_lookup(

@@ -23,6 +23,7 @@ from core.extensive_form import ExtensiveForm
 from core.extensive_form_fixed_price import build_extensive_form_fixed_price_model
 from core.discrete_price_milp import build_discrete_price_milp_model
 from core.solver import solve_gurobi_model
+from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
 
 # Import utilities from the new utils module
 from utils import (
@@ -37,7 +38,7 @@ from utils import (
 )
 
 # Setup directories
-DIRS = setup_directories(use_dist_version=False, create=True)
+DIRS = setup_directories(use_dist_version=True, create=True)
 ROOT = DIRS['root']
 CONFIG_DIR = DIRS['config']
 DATA_DIR = DIRS['data']
@@ -55,6 +56,10 @@ class Benchmark2Settings:
     price_levels: int = 10  # Number of discrete price levels for MILP
     price_levels_list: Optional[List[int]] = None
     save_results: bool = True
+    run_ph: bool = True
+    ph_rho: float = 5000.0
+    ph_max_iter: int = 100
+    ph_tol: float = 1e-4
 
     def __post_init__(self):
         if self.instance_idx is None:
@@ -170,6 +175,49 @@ def run_discrete_price_milp(
     return result
 
 
+def run_progressive_hedging(
+    ext_form: ExtensiveForm,
+    alpha: float,
+    rho: float,
+    max_iter: int,
+    tol: float,
+    verbose: int = 0,
+    gurobi_params: Dict[str, float | str] | None = None,
+) -> Dict:
+    """
+    Solve the first-stage price model with Progressive Hedging (heuristic).
+    """
+    n_scenarios = len(ext_form.scenarios)
+    start = time.time()
+    ph_res = solve_with_ph(
+        ext_form=ext_form,
+        rho=rho,
+        max_iter=max_iter,
+        alpha=alpha,
+        tol=tol,
+        gurobi_params=gurobi_params,
+    )
+    elapsed = time.time() - start
+
+    final_x = ph_res["final_x"]
+    final_p = ph_res["final_p"]
+    objective = evaluate_first_stage_solution(
+        final_x, final_p, ext_form, alpha=alpha, gurobi_params=gurobi_params
+    )
+
+    result: Dict = {
+        "method": "Progressive Hedging",
+        "status": "converged" if ph_res["converged"] else "max_iter",
+        "objective": objective,
+        "time": elapsed,
+        "n_scenarios": n_scenarios,
+        "rho": rho,
+        "iterations": ph_res["iterations"],
+        "n_facilities": sum(1 for j in ext_form.J if final_x[j] > 0.5),
+    }
+    return result
+
+
 # --------------------------------------------------------------------------- #
 # Plotting functions
 # --------------------------------------------------------------------------- #
@@ -227,6 +275,73 @@ def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> 
     plt.close()
 
 
+def plot_gap_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> None:
+    """
+    Plot optimality gap vs number of scenarios for discrete MILP and PH.
+    """
+    continuous_df = df[df["method"] == "Continuous Price MIQP"]
+    if continuous_df.empty:
+        print("No continuous MIQP results; cannot compute gaps.")
+        return
+
+    # Only keep rows where gap_vs_continuous is available
+    gap_df = df[df["gap_vs_continuous"].notna()].copy()
+    if gap_df.empty:
+        print("No gap data to plot.")
+        return
+
+    plt.figure(figsize=(10, 6))
+
+    # Discrete MILP: group by price_levels
+    discrete_df = gap_df[gap_df["method"] == "Discrete Price MILP"]
+    if not discrete_df.empty:
+        price_levels_list = sorted(discrete_df["price_levels"].unique())
+        colors = plt.cm.Set2(np.linspace(0, 1, len(price_levels_list)))
+        for idx, p_level in enumerate(price_levels_list):
+            p_df = discrete_df[discrete_df["price_levels"] == p_level]
+            p_df = p_df.sort_values("n_scenarios")
+            plt.plot(
+                p_df["n_scenarios"],
+                p_df["gap_vs_continuous"] * 100,
+                marker='o',
+                linewidth=2,
+                markersize=7,
+                label=f"Discrete MILP p={p_level}",
+                color=colors[idx],
+            )
+
+    # PH: single series
+    ph_df = gap_df[gap_df["method"] == "Progressive Hedging"]
+    if not ph_df.empty:
+        ph_df = ph_df.sort_values("n_scenarios")
+        plt.plot(
+            ph_df["n_scenarios"],
+            ph_df["gap_vs_continuous"] * 100,
+            marker='x',
+            linewidth=2.5,
+            markersize=9,
+            label="Progressive Hedging",
+            color='red',
+            linestyle='--'
+        )
+
+    plt.xlabel("Number of Scenarios", fontsize=12)
+    plt.ylabel("Gap vs Continuous MIQP (%)", fontsize=12)
+    plt.title("Optimality Gap vs Scenarios", fontsize=14, fontweight='bold')
+    plt.legend(fontsize=9)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    Path("results").mkdir(exist_ok=True)
+    scenarios_str = "_".join(map(str, settings.scenarios_list))
+    price_str = "_".join(map(str, settings.price_levels_list))
+    inst_str = "_".join(map(str, settings.instance_idx))
+    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_gap_vs_scenarios.png"
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"Gap-vs-scenarios plot saved to: {plot_path}")
+    plt.close()
+
+
 def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> None:
     """
     Plot time complexity vs number of scenarios for different methods.
@@ -240,6 +355,7 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
     # Separate continuous and discrete methods
     continuous_df = df[df["method"] == "Continuous Price MIQP"].copy()
     discrete_df = df[df["method"] == "Discrete Price MILP"].copy()
+    ph_df = df[df["method"] == "Progressive Hedging"].copy()
 
     plt.figure(figsize=(12, 7))
 
@@ -288,6 +404,20 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
                 color=colors[idx],
                 linestyle=linestyles[idx % len(linestyles)]
             )
+
+    # Plot PH
+    if not ph_df.empty:
+        ph_df = ph_df.sort_values("n_scenarios")
+        plt.plot(
+            ph_df["n_scenarios"],
+            ph_df["time"],
+            marker='x',
+            linewidth=2.5,
+            markersize=9,
+            label="Progressive Hedging",
+            color='red',
+            linestyle='--'
+        )
 
     plt.xlabel("Number of Scenarios", fontsize=12)
     plt.ylabel("Time (seconds)", fontsize=12)
@@ -383,6 +513,31 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
                     f"gap_vs_continuous={discrete_res.get('gap_vs_continuous')}"
                 )
 
+            # 3) Progressive Hedging (optional)
+            if settings.run_ph:
+                ph_res = run_progressive_hedging(
+                    ext_form,
+                    alpha=settings.alpha,
+                    rho=settings.ph_rho,
+                    max_iter=settings.ph_max_iter,
+                    tol=settings.ph_tol,
+                    verbose=0,
+                    gurobi_params=gurobi_params,
+                )
+                ph_res["instance"] = inst_idx
+                ph_res["config"] = config_name
+
+                if ef_res.get("objective") is not None and ph_res.get("objective") is not None:
+                    continuous_obj = ef_res["objective"]
+                    ph_obj = ph_res["objective"]
+                    ph_res["gap_vs_continuous"] = (ph_obj - continuous_obj) / abs(continuous_obj) if abs(continuous_obj) > 1e-8 else None
+
+                all_results.append(ph_res)
+                print(
+                    f"[Progressive Hedging ] status={ph_res['status']} obj={ph_res['objective']} "
+                    f"time={ph_res['time']:.2f}s gap_vs_continuous={ph_res.get('gap_vs_continuous')}"
+                )
+
     df = pd.DataFrame(all_results)
 
     # Summary and save
@@ -405,17 +560,22 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
         print_section_header("GENERATING PLOTS")
         plot_gap_vs_price_levels(df, settings)
         plot_time_vs_scenarios(df, settings)
+        plot_gap_vs_scenarios(df, settings)
 
     return df
 
 
 if __name__ == "__main__":
     SETTINGS = Benchmark2Settings(
-        config_name="c5_f5_cf1",
+        config_name="c50_f20_cf6",
         instance_idx=[1],
         scenarios_list=[10, 20, 50, 100, 200],
         price_levels_list=[3, 5, 8, 10, 15],
         alpha=0.1,
         save_results=True,
+        run_ph=True,
+        ph_rho=5000.0,
+        ph_max_iter=100,
+        ph_tol=1e-4,
     )
     run_benchmark(SETTINGS)

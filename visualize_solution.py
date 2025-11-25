@@ -76,7 +76,16 @@ def get_second_stage_flows_for_scenarios(
     return scenario_results
 
 
-def visualize_network(instance: Instance, solution: dict, title: str, save_path: Path | None = None):
+def visualize_network(
+    instance: Instance,
+    solution: dict,
+    title: str,
+    save_path: Path | None = None,
+    max_flow_scale: float | None = None,
+    tau_scale_max: float | None = None,
+    boundary_val: float | None = None,
+    use_y_boundary: bool = False,
+):
     """
     Generates and displays a network visualization.
     """
@@ -121,17 +130,16 @@ def visualize_network(instance: Instance, solution: dict, title: str, save_path:
     if not flows:
         print("Warning: No flow information provided in the solution.")
     
-    # Get all non-zero flows to determine quartiles
-    non_zero_flows = [val for val in flows.values() if val > 1e-4]
-    
-    # Define styles for flow edges
-    flow_styles = {
-        "Low (0-25%)":    {"color": "lightblue", "width": 1.0},
-        "Medium (25-50%)": {"color": "deepskyblue", "width": 2.0},
-        "High (50-75%)":   {"color": "royalblue", "width": 3.0},
-        "Very High (75-100%)": {"color": "navy", "width": 4.0},
-    }
-    quartiles = np.percentile(non_zero_flows, [25, 50, 75]) if non_zero_flows else [0,0,0]
+    # Flow scaling: fixed proportion up to max_flow_scale
+    non_zero_flows = [val for val in flows.values() if val > 1e-6]
+    max_flow = max_flow_scale if max_flow_scale is not None else (max(non_zero_flows) if non_zero_flows else 1.0)
+    min_width, max_width = 0.8, 4.5
+
+    # Tariff color mapping: use absolute scale up to tau_scale_max (fallback to max observed)
+    tau_vals = list(tariffs.values()) if tariffs else []
+    abs_tau_max = max(tau_vals) if tau_vals else 0.0
+    tau_scale = tau_scale_max if tau_scale_max is not None else (abs_tau_max if abs_tau_max > 0 else 1.0)
+    cmap = plt.cm.Blues
 
     # Process all possible (customer, facility) pairs
     for i in instance.I:
@@ -141,26 +149,30 @@ def visualize_network(instance: Instance, solution: dict, title: str, save_path:
             
             # Only consider edges connected to OPEN facilities
             if j in opened_facilities:
-                # Add tariff label for this potential edge
-                edge_labels[(c_node, f_node)] = f"τ: {tariffs.get((i,j), 0):.1%}"
+                tau_val = tariffs.get((i, j), 0.0)
+                tau_norm = min(max(tau_val / tau_scale, 0.0), 1.0)
+                color = cmap(0.3 + 0.7 * tau_norm)  # keep lighter low, darker high
+                flow_lbl = f"q: {flow_val:.1f}"
+                tau_lbl = f"τ: {tau_val:.1%}"
+                edge_labels[(c_node, f_node)] = f"{flow_lbl}\n{tau_lbl}"
 
                 if flow_val > 1e-4:
-                    if flow_val <= quartiles[0]:
-                        style = flow_styles["Low (0-25%)"]
-                    elif flow_val <= quartiles[1]:
-                        style = flow_styles["Medium (25-50%)"]
-                    elif flow_val <= quartiles[2]:
-                        style = flow_styles["High (50-75%)"]
-                    else:
-                        style = flow_styles["Very High (75-100%)"]
-                    G.add_edge(c_node, f_node, color=style["color"], width=style["width"], style='solid')
+                    width = min_width + (max_width - min_width) * min(flow_val / max_flow, 1.0)
+                    G.add_edge(c_node, f_node, color=color, width=width, style='solid')
                     non_zero_edges.append((c_node, f_node))
                 else:
                     # Add edge for zero flow since the facility is open
-                    G.add_edge(c_node, f_node, color='gray', width=0.8, style='dashed')
+                    G.add_edge(c_node, f_node, color=color, width=min_width * 0.8, style='dashed')
                     zero_flow_edges.append((c_node, f_node))
 
     plt.figure(figsize=(14, 12))
+
+    # Draw boundary line (default to 0 if not provided)
+    boundary_draw = boundary_val if boundary_val is not None else 0.0
+    if use_y_boundary:
+        plt.axhline(y=boundary_draw, color='black', linestyle='--', linewidth=1.0, alpha=0.6)
+    else:
+        plt.axvline(x=boundary_draw, color='black', linestyle='--', linewidth=1.0, alpha=0.6)
 
     # Draw nodes
     node_colors = ["skyblue" if G.nodes[n]['type'] == 'customer' else ('green' if G.nodes[n].get('open') else 'red') for n in G.nodes]
@@ -174,7 +186,9 @@ def visualize_network(instance: Instance, solution: dict, title: str, save_path:
 
     # Draw zero-flow edges (dashed)
     if zero_flow_edges:
-        nx.draw_networkx_edges(G, pos, edgelist=zero_flow_edges, edge_color='gray', width=0.8, alpha=0.8, style='dashed')
+        edge_colors = [G[u][v]['color'] for u, v in zero_flow_edges]
+        edge_widths = [G[u][v]['width'] for u, v in zero_flow_edges]
+        nx.draw_networkx_edges(G, pos, edgelist=zero_flow_edges, edge_color=edge_colors, width=edge_widths, alpha=0.8, style='dashed')
 
     # Draw edge labels (tariffs)
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=7, font_color='darkred', label_pos=0.3,
@@ -183,8 +197,7 @@ def visualize_network(instance: Instance, solution: dict, title: str, save_path:
     # Draw node labels (C_i, F_j)
     nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10)
 
-    # --- Add price/demand labels with auto-adjustment ---
-    # 1. Collect text objects for adjustText
+    # --- Add price/demand labels (customers) & fixed cost (facilities) with auto-adjustment ---
     texts = []
     prices = solution.get("prices", {})
     served_demand = solution.get("served_demand", {})
@@ -192,23 +205,59 @@ def visualize_network(instance: Instance, solution: dict, title: str, save_path:
         s_val = served_demand.get(i, 0)
         demand_at_price = max(0, -instance.a[i] * p_val + instance.b[i])
         coords = instance.customer_coords[i]
-        # Initial position is at the node's coordinates
-        texts.append(plt.text(coords[0], coords[1], f"p: {p_val:.1f}\nh(p): {demand_at_price:.1f}\ns: {s_val:.1f}", fontsize=8, color='purple', ha='center', va='center'))
+        texts.append(
+            plt.text(
+                coords[0],
+                coords[1],
+                f"p: {p_val:.1f}\nh(p): {demand_at_price:.1f}\ns: {s_val:.1f}",
+                fontsize=8,
+                color='purple',
+                ha='center',
+                va='center',
+            )
+        )
+    # Facility fixed costs
+    for j, coords in instance.facility_coords.items():
+        f_val = instance.f[j]
+        texts.append(
+            plt.text(
+                coords[0],
+                coords[1] + 4.0,
+                f"f: {f_val:.0f}",
+                fontsize=8,
+                color='darkgreen',
+                ha='center',
+                va='center',
+            )
+        )
 
-    # 2. Let adjustText find optimal positions for the labels
-    adjust_text(texts, arrowprops=dict(arrowstyle='->', color='grey', lw=0.8), bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+    adjust_text(
+        texts,
+        arrowprops=dict(arrowstyle='->', color='grey', lw=0.8),
+        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1),
+    )
 
     plt.title(title, fontsize=16)
     plt.xlabel("X Coordinate")
     plt.ylabel("Y Coordinate")
     plt.grid(True)
 
-    # Add a custom legend
-    legend_elements = [plt.Line2D([0], [0], color=style['color'], lw=style['width'], label=f"Flow: {label}")
-                       for label, style in flow_styles.items()]
-    legend_elements.append(plt.Line2D([0], [0], color='gray', lw=0.8, linestyle='--', label='Flow: Zero'))
-    plt.legend(handles=legend_elements, loc='lower right', title="Transportation Volume")
+    # Add a custom legend for flow widths (absolute scale) and tariff color ramp
+    legend_elements = [
+        plt.Line2D([0], [0], color=cmap(0.3), lw=min_width, label="Low flow (low τ)"),
+        plt.Line2D([0], [0], color=cmap(1.0), lw=max_width, label="High flow (high τ)"),
+        plt.Line2D([0], [0], color=cmap(0.6), lw=min_width * 0.8, linestyle='--', label='Zero flow (colored by τ)'),
+    ]
+    plt.legend(
+        handles=legend_elements,
+        loc='upper left',
+        bbox_to_anchor=(1.02, 1.0),
+        borderaxespad=0.0,
+        title="Flow & Tariff\n(darker = higher τ)",
+    )
     
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # leave space for legend
+
     # Save the figure before showing it
     if save_path:
         plt.savefig(save_path, bbox_inches='tight', dpi=150)

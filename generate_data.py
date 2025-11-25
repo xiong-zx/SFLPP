@@ -129,13 +129,16 @@ if __name__ == "__main__":
         #     "c10_f5_cf1",
         #     "c10_f10_cf1",
         # ),
+        # config_names=(
+        #     "c10_f5_cf2",
+        #     "c10_f5_cf3",
+        #     "c10_f5_cf4",
+        # ),
         config_names=(
-            "c10_f5_cf2",
-            "c10_f5_cf3",
-            "c10_f5_cf4",
+            "c20_f5_cf7",
         ),
         instances_per_config=3,
-        scenarios=(10, 20, 50),
+        scenarios=(10, 20, 50, 100, 200),
         base_seed=0,
         overwrite=True,
     )

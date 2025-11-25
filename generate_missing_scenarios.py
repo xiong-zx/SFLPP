@@ -8,6 +8,7 @@ from core.extensive_form import sample_extensive_form
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 
+
 def generate_ef(config_name: str, instance_idx: int, n_scenarios: int, seed: int = None):
     """Generate extensive form file for a specific instance and scenario count."""
 
@@ -30,6 +31,7 @@ def generate_ef(config_name: str, instance_idx: int, n_scenarios: int, seed: int
     print(f"Saved extensive form to {ef_path}")
 
     return ef_path
+
 
 if __name__ == "__main__":
     # Generate missing files for c5_f5_cf1_ins1

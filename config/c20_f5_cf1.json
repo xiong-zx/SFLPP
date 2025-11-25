@@ -1,0 +1,17 @@
+{
+  "n_customers": 20,
+  "n_facilities": 5,
+  "p_min": 20.0,
+  "p_max": 80.0,
+  "gamma": 0.3,
+  "base_demand_min": 50,
+  "base_demand_max": 150,
+  "f_min": 500.0,
+  "f_max": 1000.0,
+  "c_min": 10.0,
+  "c_max": 50.0,
+  "tau_max": 0.4,
+  "base_capacity_factor": 1.2,
+  "cap_fluctuation": 0.2,
+  "seed": 752767290
+}

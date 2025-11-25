@@ -13,6 +13,7 @@ from time import time
 from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
+from utils import load_gurobi_params, apply_gurobi_defaults
 
 # --- Global Switch ---
 USE_DIST_VERSION = True
@@ -27,6 +28,10 @@ EF_LOG_DIR = ROOT / "log_dist" if USE_DIST_VERSION else ROOT / "log"
 RESULTS_DIR.mkdir(exist_ok=True)
 PH_LOG_DIR.mkdir(exist_ok=True)
 MAX_WORKERS = 6
+
+# Load Gurobi params once and apply as defaults
+GUROBI_PARAMS = load_gurobi_params(CONFIG_DIR / "gurobi_params.json")
+apply_gurobi_defaults(GUROBI_PARAMS)
 
 
 # %%
@@ -58,12 +63,20 @@ def run_ph_experiment(
         max_iter=ph_params.get("max_iter", 100),
         alpha=ph_params.get("alpha", 0.1),
         tol=ph_params.get("tol", 1e-4),
+        gurobi_params=GUROBI_PARAMS,
     )
     solve_time = time() - start_time
 
     # Evaluate the final solution to get the true objective value
     final_x = ph_results["final_x"]
-    objective = evaluate_first_stage_solution(final_x, ext_form, alpha=ph_params.get("alpha", 0.1))
+    final_p = ph_results["final_p"]
+    objective = evaluate_first_stage_solution(
+        final_x,
+        final_p,
+        ext_form,
+        alpha=ph_params.get("alpha", 0.1),
+        gurobi_params=GUROBI_PARAMS,
+    )
     n_facilities = sum(1 for v in final_x.values() if v > 0.5)
 
     result = {
@@ -75,6 +88,7 @@ def run_ph_experiment(
         "solve_time": solve_time,
         "objective": objective,
         "iterations": ph_results["iterations"],
+        "final_p": final_p,
         "opened_facilities": [j for j, v in final_x.items() if v > 0.5],
         "n_facilities": n_facilities,
     }

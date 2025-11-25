@@ -1,14 +1,21 @@
 {
   "config": "c5_f5_cf1",
-  "gap_vs_optimal": 0.0739102904718148,
+  "final_p": {
+    "0": 50.063290869451336,
+    "1": 50.05349986088922,
+    "2": 50.05546791564916,
+    "3": 50.065255764053205,
+    "4": 50.057826088077434
+  },
   "instance_idx": 1,
   "iterations": 4,
-  "n_facilities": 2,
+  "n_facilities": 3,
   "n_scenarios": 50,
-  "objective": -12446.525874568053,
+  "objective": -13037.82752691433,
   "opened_facilities": [
-    1,
-    2
+    2,
+    3,
+    4
   ],
   "ph_params": {
     "alpha": 0.1,
@@ -16,6 +23,6 @@
     "rho": 5000.0,
     "tol": 0.0001
   },
-  "solve_time": 92.36992597579956,
+  "solve_time": 19.173823833465576,
   "status": "converged"
 }

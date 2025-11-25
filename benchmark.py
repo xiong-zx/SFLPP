@@ -134,7 +134,8 @@ def run_progressive_hedging(
         solve_time = time.time() - start_time
 
         final_x = ph_results["final_x"]
-        objective = evaluate_first_stage_solution(final_x, ext_form, alpha=0.1)
+        final_p = ph_results["final_p"]
+        objective = evaluate_first_stage_solution(final_x, final_p, ext_form, alpha=0.1)
         n_facilities = sum(1 for v in final_x.values() if v > 0.5)
 
         print(f"Status: {'CONVERGED' if ph_results['converged'] else 'MAX_ITER'}")

@@ -18,9 +18,11 @@ def solve_ph_subproblem(
     scen_idx: int,
     ext_form: ExtensiveForm,
     x_bar: Dict[int, float],
-    u_multipliers: Dict[int, float],
+    p_bar: Dict[int, float],
+    multipliers: Dict[str, Dict[int, float]],
     rho: float,
     alpha: float,
+    gurobi_params: Dict[str, float | str] | None = None,
 ) -> Tuple[Dict[str, Any], float]:
     """
     Solves the subproblem for a single scenario in the Progressive Hedging algorithm.
@@ -34,6 +36,12 @@ def solve_ph_subproblem(
 
     m = gp.Model(f"PH_subproblem_w{scen_idx}")
     m.setParam("OutputFlag", 0)  # Suppress Gurobi output for subproblems
+    if gurobi_params:
+        for k_param, v_param in gurobi_params.items():
+            m.setParam(k_param, v_param)
+    # Ensure nonconvex bilinear terms are allowed
+    if m.getParamInfo("NonConvex"):
+        m.setParam("NonConvex", 2)
 
     # Scenario-specific variables
     x = m.addVars(J, vtype=GRB.BINARY, name="x")
@@ -68,11 +76,17 @@ def solve_ph_subproblem(
     # PH terms (linearized quadratic penalty)
     for j in J:
         # Multiplier term: u * x
-        obj += u_multipliers[j] * x[j]
+        obj += multipliers["x"][j] * x[j]
         # Quadratic penalty term: (rho/2) * (x - x_bar)^2
         # Linearized as: (rho/2) * (x^2 - 2*x*x_bar + x_bar^2)
         # Since x is binary, x^2 = x. x_bar^2 is a constant and can be ignored.
         obj += (rho / 2.0) * (x[j] * (1.0 - 2.0 * x_bar[j]))
+    for i in I:
+        # Multiplier term: v * p
+        obj += multipliers["p"][i] * p[i]
+        # Quadratic penalty term: (rho/2) * (p - p_bar)^2
+        # Keep convex quadratic; drop constant p_bar^2.
+        obj += (rho / 2.0) * (p[i] * p[i] - 2.0 * p_bar[i] * p[i])
 
     m.setObjective(obj, GRB.MINIMIZE)
     m.optimize()
@@ -85,6 +99,7 @@ def solve_ph_subproblem(
         "x": {j: x[j].X for j in J},
         "p": {i: p[i].X for i in I},
         "s": {i: s[i].X for i in I},
+        "q": {(i, j): q[i, j].X for i in I for j in J},
     }
     return sol, m.ObjVal
 
@@ -95,6 +110,7 @@ def solve_with_ph(
     max_iter: int = 100,
     alpha: float = 0.1,
     tol: float = 1e-4,
+    gurobi_params: Dict[str, float | str] | None = None,
 ) -> Dict[str, Any]:
     """
     Main Progressive Hedging algorithm loop.
@@ -105,10 +121,15 @@ def solve_with_ph(
 
     # --- Initialization (k=0) ---
     k = 0
-    u_multipliers = {w: {j: 0.0 for j in J} for w in W}
+    x_multipliers = {w: {j: 0.0 for j in J} for w in W}
+    p_multipliers = {w: {i: 0.0 for i in I} for w in W}
     convergence_history = []
     x_scenario = {w: {j: 0.0 for j in J} for w in W}  # Initial feasible x is all zeros
+    p_scenario = {
+        w: {i: (inst.config.p_min + inst.config.p_max) / 2.0 for i in I} for w in W
+    }
     x_bar = {j: 0.0 for j in J}
+    p_bar = {i: (inst.config.p_min + inst.config.p_max) / 2.0 for i in I}
 
     print("--- Starting Progressive Hedging ---")
     print(f"Params: rho={rho}, max_iter={max_iter}, tol={tol}")
@@ -120,22 +141,38 @@ def solve_with_ph(
         # --- Step 1: Solve subproblems for each scenario ---
         for w in W:
             sol, _ = solve_ph_subproblem(
-                inst, w, ext_form, x_bar, u_multipliers[w], rho, alpha
+                inst,
+                w,
+                ext_form,
+                x_bar,
+                p_bar,
+                {"x": x_multipliers[w], "p": p_multipliers[w]},
+                rho,
+                alpha,
+                gurobi_params=gurobi_params,
             )
             x_scenario[w] = sol["x"]
+            p_scenario[w] = sol["p"]
 
         # --- Step 2: Update consensus variable x_bar ---
         x_bar_new = {j: 0.0 for j in J}
+        p_bar_new = {i: 0.0 for i in I}
         for j in J:
             # Use scenario weights for averaging
             avg_x_j = sum(ext_form.scenarios[w].weight * x_scenario[w][j] for w in W) 
             x_bar_new[j] = avg_x_j
+        for i in I:
+            avg_p_i = sum(ext_form.scenarios[w].weight * p_scenario[w][i] for w in W)
+            p_bar_new[i] = avg_p_i
         x_bar = x_bar_new
+        p_bar = p_bar_new
 
         # --- Step 3: Update multipliers u ---
         for w in W:
             for j in J:
-                u_multipliers[w][j] += rho * (x_scenario[w][j] - x_bar[j])
+                x_multipliers[w][j] += rho * (x_scenario[w][j] - x_bar[j])
+            for i in I:
+                p_multipliers[w][i] += rho * (p_scenario[w][i] - p_bar[i])
 
         # --- Step 4: Check for convergence ---
         max_diff = 0.0
@@ -144,10 +181,16 @@ def solve_with_ph(
                 diff = abs(x_scenario[w][j] - x_bar[j])
                 if diff > max_diff:
                     max_diff = diff
+            for i in I:
+                diff_p = abs(p_scenario[w][i] - p_bar[i])
+                if diff_p > max_diff:
+                    max_diff = diff_p
         convergence_history.append(max_diff)
 
         avg_x_bar_val = np.mean(list(x_bar.values()))
-        print(f"Consensus variable (avg): {avg_x_bar_val:.4f}")
+        avg_p_bar_val = np.mean(list(p_bar.values()))
+        print(f"Consensus variable x (avg): {avg_x_bar_val:.4f}")
+        print(f"Consensus variable p (avg): {avg_p_bar_val:.4f}")
         print(f"Max deviation |x - x_bar|: {max_diff:.6f}")
 
         if max_diff < tol:
@@ -159,10 +202,13 @@ def solve_with_ph(
 
     # Post-process: round x_bar to get final integer solution
     final_x = {j: round(val) for j, val in x_bar.items()}
+    final_p = p_bar.copy()
 
     return {
         "final_x": final_x,
+        "final_p": final_p,
         "x_bar": x_bar,
+        "p_bar": p_bar,
         "iterations": k,
         "converged": max_diff < tol,
         "convergence_history": convergence_history,
@@ -170,7 +216,11 @@ def solve_with_ph(
 
 
 def evaluate_first_stage_solution(
-    x_solution: Dict[int, float], ext_form: ExtensiveForm, alpha: float = 0.1
+    x_solution: Dict[int, float],
+    p_solution: Dict[int, float],
+    ext_form: ExtensiveForm,
+    alpha: float = 0.1,
+    gurobi_params: Dict[str, float | str] | None = None,
 ) -> float:
     """
     Given a fixed first-stage solution x, solve the second-stage problems
@@ -181,7 +231,6 @@ def evaluate_first_stage_solution(
     f = inst.f
     a = inst.a
     b = inst.b
-    cfg = inst.config
 
     # The model is now just a collection of independent QPs, one for each scenario
     m = gp.Model("evaluation")
@@ -189,7 +238,6 @@ def evaluate_first_stage_solution(
 
     q = m.addVars(I, J, W, lb=0.0, name="q")
     s = m.addVars(I, W, lb=0.0, name="s")
-    p = m.addVars(I, W, lb=cfg.p_min, ub=cfg.p_max, name="p")
 
     # Add all constraints from the original extensive form, but with x fixed
     for w in W:
@@ -200,12 +248,12 @@ def evaluate_first_stage_solution(
             # Here x_solution is used as a constant
             m.addConstr(gp.quicksum(q[i, j, w] for i in I) <= scen.u[j] * x_solution[j])
         for i in I:
-            demand_at_price = -a[i] * p[i, w] + b[i]
+            demand_at_price = -a[i] * p_solution[i] + b[i]
             m.addConstr(s[i, w] <= demand_at_price)
             m.addConstr(s[i, w] >= (1.0 - alpha) * demand_at_price)
 
     # Calculate objective value
-    obj = gp.QuadExpr()
+    obj = gp.LinExpr()
     # 1. Fixed cost from the given x_solution
     obj += gp.quicksum(f[j] * x_solution[j] for j in J)
 
@@ -214,10 +262,10 @@ def evaluate_first_stage_solution(
         scen = ext_form.scenarios[w]
         weight = scen.weight
         obj += weight * gp.quicksum(scen.bar_c[(i, j)] * q[i, j, w] for i in I for j in J)
-        obj -= weight * gp.quicksum(p[i, w] * s[i, w] for i in I)
+        obj -= weight * gp.quicksum(p_solution[i] * s[i, w] for i in I)
 
     m.setObjective(obj, GRB.MINIMIZE)
-    solve_gurobi_model(m)
+    solve_gurobi_model(m, params=gurobi_params)
 
     if m.Status == GRB.OPTIMAL:
         return m.ObjVal
