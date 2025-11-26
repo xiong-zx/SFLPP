@@ -169,18 +169,16 @@ def build_extensive_form_model(
 
     # first-stage binaries x_j
     x = m.addVars(J, vtype=GRB.BINARY, name="x")
-
-    # second-stage continuous q_ij^w, s_i^w, and price decisions p_i^w
-    q = m.addVars(I, J, W, lb=0.0, vtype=GRB.CONTINUOUS, name="q")
-    s = m.addVars(I, W, lb=0.0, vtype=GRB.CONTINUOUS, name="s")
     p = m.addVars(
         I,
-        W,
         lb=cfg.p_min,
         ub=cfg.p_max,
         vtype=GRB.CONTINUOUS,
         name="p",
     )
+    # second-stage continuous q_ij^w, s_i^w, and price decisions p_i^w
+    q = m.addVars(I, J, W, lb=0.0, vtype=GRB.CONTINUOUS, name="q")
+    s = m.addVars(I, W, lb=0.0, vtype=GRB.CONTINUOUS, name="s")
 
     # s_i^w = Σ_j q_ij^w
     for w in W:
@@ -202,7 +200,7 @@ def build_extensive_form_model(
     # demand fulfillment bounds: (1-alpha) h_i(p_i^w) ≤ s_i^w ≤ h_i(p_i^w)
     for w in W:
         for i in I:
-            demand_at_price = -a[i] * p[i, w] + b[i]
+            demand_at_price = -a[i] * p[i] + b[i]
             m.addConstr(
                 s[i, w] <= demand_at_price,
                 name=f"demand_upper_i{i}_w{w}",
@@ -226,25 +224,9 @@ def build_extensive_form_model(
                 # Σ_j bar_c_ij(ω) q_ij^w
                 obj += weight * gp.quicksum(scen.bar_c[(i, j)] * q[i, j, w] for j in J)
                 # - p_i^w Σ_j q_ij^w
-                obj += weight * (-(p[i, w] * s[i, w]))
+                obj += weight * (-(p[i] * s[i, w]))
 
         m.setObjective(obj, GRB.MINIMIZE)
-        z_worst = None
-
-    elif risk_measure == "worst_case":
-        z_worst = m.addVar(lb=-GRB.INFINITY, vtype=GRB.CONTINUOUS, name="z_worst")
-        fixed_cost = gp.quicksum(f[j] * x[j] for j in J)
-
-        for w in W:
-            scen = scenarios[w]
-            scenario_expr = gp.QuadExpr()
-            for i in I:
-                scenario_expr += gp.quicksum(scen.bar_c[(i, j)] * q[i, j, w] for j in J)
-                scenario_expr += -(p[i, w] * s[i, w])
-
-            m.addConstr(z_worst >= scenario_expr, name=f"worstcase_w{w}")
-
-        m.setObjective(fixed_cost + z_worst, GRB.MINIMIZE)
 
     else:
         raise NotImplementedError(
@@ -257,6 +239,5 @@ def build_extensive_form_model(
         "q": q,
         "s": s,
         "p": p,
-        "z_worst": z_worst,
     }
     return m, var_dict

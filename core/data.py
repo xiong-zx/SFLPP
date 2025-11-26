@@ -25,7 +25,7 @@ class Config:
     # linear demand calibration: h_i(p) = -a_i p + b_i
     p_min: float = 20.0
     p_max: float = 80.0
-    gamma: float = 0.3  # demand at p_max is gamma * base_demand
+    gamma: float | List[float] = 0.3  # demand at p_max is gamma * base_demand
 
     # base demand range
     base_demand_min: int = 50
@@ -129,9 +129,14 @@ class Instance:
                 for j in J:
                     cust_coord = customer_coords[i]
                     fac_coord = facility_coords[j]
-                    distance = ((cust_coord[0] - fac_coord[0])**2 + (cust_coord[1] - fac_coord[1])**2)**0.5
+                    distance = (
+                        (cust_coord[0] - fac_coord[0]) ** 2
+                        + (cust_coord[1] - fac_coord[1]) ** 2
+                    ) ** 0.5
                     # Base cost is distance-based, plus a small random factor
-                    c[(i, j)] = float(distance * unit_cost_per_distance * rng.uniform(0.9, 1.1))
+                    c[(i, j)] = float(
+                        distance * unit_cost_per_distance * rng.uniform(0.9, 1.1)
+                    )
         else:
             customer_coords = None
             facility_coords = None
@@ -147,14 +152,19 @@ class Instance:
         p_min, p_max, gamma = cfg.p_min, cfg.p_max, cfg.gamma
         if p_max <= p_min:
             raise ValueError("p_max must be greater than p_min.")
-        if not (0.0 <= gamma < 1.0):
+        if isinstance(gamma, float):
+            gamma = np.full(cfg.n_customers, gamma)
+        else:
+            gamma = np.array(gamma)
+        if not (0.0 <= gamma).all() or not (gamma < 1.0).all():
             raise ValueError("gamma should be in [0,1).")
 
         a: Dict[int, float] = {}
         b: Dict[int, float] = {}
+
         for i, d0 in base_demand.items():
             d0 = float(d0)
-            a_i = (1.0 - gamma) * d0 / (p_max - p_min)
+            a_i = (1.0 - gamma[i]) * d0 / (p_max - p_min)
             b_i = d0 + a_i * p_min
             a[i] = a_i
             b[i] = b_i
@@ -228,9 +238,17 @@ class Instance:
 
         # Deserialize coordinates if they exist
         customer_coords_raw = d.get("customer_coords")
-        customer_coords = {int(k): tuple(v) for k, v in customer_coords_raw.items()} if customer_coords_raw else None
+        customer_coords = (
+            {int(k): tuple(v) for k, v in customer_coords_raw.items()}
+            if customer_coords_raw
+            else None
+        )
         facility_coords_raw = d.get("facility_coords")
-        facility_coords = {int(k): tuple(v) for k, v in facility_coords_raw.items()} if facility_coords_raw else None
+        facility_coords = (
+            {int(k): tuple(v) for k, v in facility_coords_raw.items()}
+            if facility_coords_raw
+            else None
+        )
         # Handle older JSONs that might have string keys for coords
         if customer_coords and isinstance(list(customer_coords.keys())[0], str):
             customer_coords = {int(k): tuple(v) for k, v in customer_coords.items()}
