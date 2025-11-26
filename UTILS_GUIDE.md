@@ -59,7 +59,7 @@ The `utils.py` module is organized into the following sections:
 ### EF_runner.py Example
 
 ```python
-from utils import (
+from core.utils import (
     setup_directories,
     instance_file_path,
     ef_file_path,
@@ -131,7 +131,7 @@ ef_name = ef_name(config_name, inst_idx, n_scenarios)
 You can test the utils module by running:
 
 ```bash
-python utils.py
+python core/utils.py
 ```
 
 This will display example output showing:

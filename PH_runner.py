@@ -13,7 +13,7 @@ from time import time
 from core.data import Instance
 from core.extensive_form import ExtensiveForm
 from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
-from utils import load_gurobi_params, apply_gurobi_defaults
+from core.utils import load_gurobi_params, apply_gurobi_defaults
 
 # --- Global Switch ---
 USE_DIST_VERSION = True
@@ -40,7 +40,7 @@ def run_ph_experiment(
     instance_idx: int,
     n_scenarios: int,
     ph_params: Dict,
-    optimal_obj: float | None = None, # New parameter to pass the optimal objective
+    optimal_obj: float | None = None,  # New parameter to pass the optimal objective
 ) -> Dict:
     """
     Runs a single Progressive Hedging experiment for a given configuration.
@@ -119,7 +119,9 @@ def load_optimal_results(summary_path: Path) -> Dict[Tuple[str, int, int], float
     Loads optimal results from EF_runner's summary.json into a lookup dictionary.
     """
     if not summary_path.exists():
-        print(f"Warning: Optimal results file not found at {summary_path}. Gap will not be calculated.")
+        print(
+            f"Warning: Optimal results file not found at {summary_path}. Gap will not be calculated."
+        )
         return {}
 
     with open(summary_path, "r", encoding="utf-8") as f:
@@ -131,6 +133,8 @@ def load_optimal_results(summary_path: Path) -> Dict[Tuple[str, int, int], float
         if res.get("objective") is not None:
             lookup[key] = res["objective"]
     return lookup
+
+
 # %%
 if __name__ == "__main__":
     # --- Define experiments to run ---
@@ -157,8 +161,12 @@ if __name__ == "__main__":
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_task = {
             executor.submit(
-                run_ph_experiment, cfg, inst_idx, n_scenarios, ph_params,
-                optimal_obj=optimal_results_lookup.get((cfg, inst_idx, n_scenarios))
+                run_ph_experiment,
+                cfg,
+                inst_idx,
+                n_scenarios,
+                ph_params,
+                optimal_obj=optimal_results_lookup.get((cfg, inst_idx, n_scenarios)),
             ): (cfg, inst_idx, n_scenarios)
             for cfg, inst_idx, n_scenarios in tasks
         }

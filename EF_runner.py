@@ -1,6 +1,6 @@
 """
 Extensive-form solver runner that loads pre-generated data and runs multiple experiments.
-Edit CONFIG_NAME / INSTANCE_IDX_LIST / SCENARIOS_LIST below and run.
+Edit CONFIG_NAME / instance_idx_list / scenarios_list below and run.
 Jupyter-friendly: experiments are executed directly under __main__.
 """
 
@@ -15,17 +15,12 @@ from time import time
 from core.data import Instance
 from core.extensive_form import ExtensiveForm, build_extensive_form_model
 from core.solver import solve_gurobi_model, load_gurobi_params
+from core.utils import setup_directories
 
 # --- Global Switch ---
 USE_DIST_VERSION = True
+DIRS = setup_directories(use_dist_version=USE_DIST_VERSION, create=True)
 
-ROOT = Path(__file__).resolve().parent
-CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data_dist" if USE_DIST_VERSION else ROOT / "data"
-RESULTS_DIR = ROOT / "results_dist" if USE_DIST_VERSION else ROOT / "results"
-LOG_DIR = ROOT / "log_dist" if USE_DIST_VERSION else ROOT / "log"
-RESULTS_DIR.mkdir(exist_ok=True)
-LOG_DIR.mkdir(exist_ok=True)
 MAX_WORKERS = 6
 
 
@@ -36,8 +31,8 @@ def run_experiment(
     n_scenarios: int,
     gurobi_params: Dict[str, float | str],
 ) -> Dict:
-    inst_path = DATA_DIR / f"{config_name}_ins{instance_idx}.json"
-    ef_path = DATA_DIR / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
+    inst_path = DIRS["data"] / f"{config_name}_ins{instance_idx}.json"
+    ef_path = DIRS["data"] / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
 
     if not inst_path.exists():
         raise FileNotFoundError(f"Missing instance file: {inst_path}")
@@ -47,8 +42,8 @@ def run_experiment(
     inst = Instance.load_json(str(inst_path))
     ext = ExtensiveForm.load_pkl(str(ef_path))
 
-    model, vars_dict = build_extensive_form_model(ext, risk_measure="expectation")
-    gurobi_log = LOG_DIR / f"{config_name}_ins{instance_idx}_s{n_scenarios}.log"
+    model, vars_dict = build_extensive_form_model(ext)
+    gurobi_log = DIRS["log"] / f"{config_name}_ins{instance_idx}_s{n_scenarios}.log"
     if gurobi_log.exists():
         gurobi_log.unlink()
 
@@ -73,7 +68,7 @@ def run_experiment(
     }
 
     json_log_name = f"{config_name}_ins{instance_idx}_s{n_scenarios}_log.json"
-    json_log = LOG_DIR / json_log_name
+    json_log = DIRS["log"] / json_log_name
     if json_log.exists():
         json_log.unlink()
     with open(json_log, "w", encoding="utf-8") as f:
@@ -89,7 +84,7 @@ def run_experiment(
 
 # %%
 if __name__ == "__main__":
-    CONFIG_NAMES: List[str] = [
+    config_list: List[str] = [
         # "c5_f5_cf1",
         # "c5_f10_cf1",
         # "c10_f5_cf1",
@@ -98,15 +93,15 @@ if __name__ == "__main__":
         "c10_f5_cf3",
         "c10_f5_cf4",
     ]  # list of config basenames (without .json)
-    INSTANCE_IDX_LIST: List[int] = [1, 2, 3]
-    SCENARIOS_LIST: List[int] = [10, 20, 50]
+    instance_idx_list: List[int] = [1, 2, 3]
+    scenarios_list: List[int] = [10, 20, 50]
 
-    gurobi_params = load_gurobi_params(CONFIG_DIR / "gurobi_params.json")
+    gurobi_params = load_gurobi_params(DIRS["config"] / "gurobi_params.json")
 
     tasks: List[Tuple[str, int, int]] = []
-    for cfg in CONFIG_NAMES:
-        for inst_idx in INSTANCE_IDX_LIST:
-            for n_scenarios in SCENARIOS_LIST:
+    for cfg in config_list:
+        for inst_idx in instance_idx_list:
+            for n_scenarios in scenarios_list:
                 tasks.append((cfg, inst_idx, n_scenarios))
 
     all_results: List[Dict] = []
@@ -136,9 +131,11 @@ if __name__ == "__main__":
         print("\nNo results to save.")
     else:
         # Use a shortened representation of config names for the filename
-        config_str = "_".join(CONFIG_NAMES)[:50] # Truncate to avoid overly long filenames
+        config_str = "_".join(config_list)[
+            :50
+        ]  # Truncate to avoid overly long filenames
         summary_filename = f"summary_{config_str}.json"
-        summary_path = RESULTS_DIR / summary_filename
+        summary_path = DIRS["results"] / summary_filename
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, sort_keys=True)
         print(f"\nSaved summary of {len(all_results)} runs to {summary_path}")

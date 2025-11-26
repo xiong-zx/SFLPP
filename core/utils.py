@@ -14,12 +14,12 @@ Author: SFLPP Project
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple, Any
 import numpy as np
 import pandas as pd
 import gurobipy as gp
+import matplotlib.figure as figure
 import matplotlib.pyplot as plt
 
 
@@ -27,14 +27,14 @@ import matplotlib.pyplot as plt
 # Project Root and Directory Structure
 # =============================================================================
 
+
 def get_project_root() -> Path:
     """Get the project root directory."""
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent.parent
 
 
 def setup_directories(
-    use_dist_version: bool = True,
-    create: bool = True
+    use_dist_version: bool = True, create: bool = True
 ) -> Dict[str, Path]:
     """
     Set up project directories based on version flag.
@@ -49,17 +49,17 @@ def setup_directories(
     root = get_project_root()
 
     dirs = {
-        'root': root,
-        'config': root / "config",
-        'data': root / ("data_dist" if use_dist_version else "data"),
-        'results': root / ("results_dist" if use_dist_version else "results"),
-        'log': root / ("log_dist" if use_dist_version else "log"),
-        'ph_log': root / ("ph_log_dist" if use_dist_version else "ph_log"),
-        'plots': root / ("plots_dist" if use_dist_version else "plots"),
+        "root": root,
+        "config": root / "config",
+        "data": root / ("data_dist" if use_dist_version else "data"),
+        "results": root / ("results_dist" if use_dist_version else "results"),
+        "log": root / ("log_dist" if use_dist_version else "log"),
+        "ph_log": root / ("ph_log_dist" if use_dist_version else "ph_log"),
+        "plots": root / ("plots_dist" if use_dist_version else "plots"),
     }
 
     if create:
-        for key in ['config', 'data', 'results', 'log', 'ph_log', 'plots']:
+        for key in ["config", "data", "results", "log", "ph_log", "plots"]:
             dirs[key].mkdir(parents=True, exist_ok=True)
 
     return dirs
@@ -69,10 +69,9 @@ def setup_directories(
 # File Path Construction (Naming Conventions)
 # =============================================================================
 
+
 def instance_file_path(
-    config_name: str,
-    instance_idx: int,
-    data_dir: Optional[Path] = None
+    config_name: str, instance_idx: int, data_dir: Optional[Path] = None
 ) -> Path:
     """
     Construct path for instance file.
@@ -86,7 +85,7 @@ def instance_file_path(
         Path to instance JSON file
     """
     if data_dir is None:
-        data_dir = setup_directories(create=False)['data']
+        data_dir = setup_directories(create=False)["data"]
     return data_dir / f"{config_name}_ins{instance_idx}.json"
 
 
@@ -94,7 +93,7 @@ def ef_file_path(
     config_name: str,
     instance_idx: int,
     n_scenarios: int,
-    data_dir: Optional[Path] = None
+    data_dir: Optional[Path] = None,
 ) -> Path:
     """
     Construct path for extensive form (EF) file.
@@ -109,7 +108,7 @@ def ef_file_path(
         Path to extensive form pickle file
     """
     if data_dir is None:
-        data_dir = setup_directories(create=False)['data']
+        data_dir = setup_directories(create=False)["data"]
     return data_dir / f"{config_name}_ins{instance_idx}_s{n_scenarios}.pkl"
 
 
@@ -135,13 +134,14 @@ def config_file_path(config_name: str, config_dir: Optional[Path] = None) -> Pat
         Path to config JSON file
     """
     if config_dir is None:
-        config_dir = setup_directories(create=False)['config']
+        config_dir = setup_directories(create=False)["config"]
     return config_dir / f"{config_name}.json"
 
 
 # =============================================================================
 # Gurobi Utilities
 # =============================================================================
+
 
 def load_gurobi_params(path: str | Path) -> Dict[str, float | str]:
     """
@@ -198,6 +198,7 @@ def solve_gurobi_model(
 # Random Seed Generation
 # =============================================================================
 
+
 def seed_stream(base_seed: int | None) -> Iterator[int]:
     """
     Generate an infinite stream of integer seeds derived from a base seed.
@@ -217,7 +218,10 @@ def seed_stream(base_seed: int | None) -> Iterator[int]:
 # File I/O Utilities
 # =============================================================================
 
-def save_json(data: Any, path: Path | str, indent: int = 2, sort_keys: bool = False) -> None:
+
+def save_json(
+    data: Any, path: Path | str, indent: int = 2, sort_keys: bool = False
+) -> None:
     """
     Save data to JSON file.
 
@@ -252,7 +256,7 @@ def save_dataframe_results(
     base_path: Path | str,
     save_csv: bool = True,
     save_json_flag: bool = True,
-    results_list: Optional[List[Dict]] = None
+    results_list: Optional[List[Dict]] = None,
 ) -> Tuple[Optional[Path], Optional[Path]]:
     """
     Save DataFrame results to CSV and/or JSON.
@@ -274,13 +278,15 @@ def save_dataframe_results(
     json_path = None
 
     if save_csv:
-        csv_path = base_path.with_suffix('.csv')
+        csv_path = base_path.with_suffix(".csv")
         df.to_csv(csv_path, index=False)
         print(f"Results saved to: {csv_path}")
 
     if save_json_flag:
-        json_path = base_path.with_suffix('.json')
-        data = results_list if results_list is not None else df.to_dict(orient='records')
+        json_path = base_path.with_suffix(".json")
+        data = (
+            results_list if results_list is not None else df.to_dict(orient="records")
+        )
         save_json(data, json_path, indent=2)
         print(f"Results saved to: {json_path}")
 
@@ -291,12 +297,13 @@ def save_dataframe_results(
 # Results Management
 # =============================================================================
 
+
 def create_benchmark_filename(
     config_name: str,
     instance_list: List[int],
     scenarios_list: List[int],
     suffix: str = "",
-    price_levels_list: Optional[List[int]] = None
+    price_levels_list: Optional[List[int]] = None,
 ) -> str:
     """
     Create a descriptive filename for benchmark results.
@@ -314,11 +321,7 @@ def create_benchmark_filename(
     inst_str = "_".join(map(str, instance_list))
     scenarios_str = "_".join(map(str, scenarios_list))
 
-    parts = [
-        config_name,
-        f"ins{inst_str}",
-        f"scenarios_{scenarios_str}"
-    ]
+    parts = [config_name, f"ins{inst_str}", f"scenarios_{scenarios_str}"]
 
     if price_levels_list:
         price_str = "_".join(map(str, price_levels_list))
@@ -337,8 +340,8 @@ def save_benchmark_results(
     scenarios_list: List[int],
     results_dir: Path | str,
     suffix: str = "",
-    price_levels_list: Optional[List[int]] = None
-) -> Tuple[Path, Path]:
+    price_levels_list: Optional[List[int]] = None,
+) -> Tuple[Optional[Path], Optional[Path]]:
     """
     Save benchmark results with standardized naming.
 
@@ -358,21 +361,19 @@ def save_benchmark_results(
     results_dir.mkdir(parents=True, exist_ok=True)
 
     filename = create_benchmark_filename(
-        config_name,
-        instance_list,
-        scenarios_list,
-        suffix,
-        price_levels_list
+        config_name, instance_list, scenarios_list, suffix, price_levels_list
     )
 
     df = pd.DataFrame(results)
     base_path = results_dir / filename
 
-    return save_dataframe_results(df, base_path, save_csv=True, save_json_flag=True, results_list=results)
+    return save_dataframe_results(
+        df, base_path, save_csv=True, save_json_flag=True, results_list=results
+    )
 
 
 def load_optimal_results_lookup(
-    summary_path: Path | str
+    summary_path: Path | str,
 ) -> Dict[Tuple[str, int, int], float]:
     """
     Load optimal results from summary JSON into a lookup dictionary.
@@ -403,6 +404,7 @@ def load_optimal_results_lookup(
 # Plotting Utilities
 # =============================================================================
 
+
 def setup_matplotlib_defaults(font_size: int = 10) -> None:
     """
     Set up matplotlib with consistent defaults for the project.
@@ -410,26 +412,28 @@ def setup_matplotlib_defaults(font_size: int = 10) -> None:
     Args:
         font_size: Base font size
     """
-    plt.rcParams.update({
-        'font.size': font_size,
-        'axes.labelsize': font_size + 2,
-        'axes.titlesize': font_size + 4,
-        'xtick.labelsize': font_size,
-        'ytick.labelsize': font_size,
-        'legend.fontsize': font_size - 1,
-        'figure.titlesize': font_size + 6,
-        'figure.dpi': 100,
-        'savefig.dpi': 300,
-        'savefig.bbox': 'tight',
-    })
+    plt.rcParams.update(
+        {
+            "font.size": font_size,
+            "axes.labelsize": font_size + 2,
+            "axes.titlesize": font_size + 4,
+            "xtick.labelsize": font_size,
+            "ytick.labelsize": font_size,
+            "legend.fontsize": font_size - 1,
+            "figure.titlesize": font_size + 6,
+            "figure.dpi": 100,
+            "savefig.dpi": 300,
+            "savefig.bbox": "tight",
+        }
+    )
 
 
 def save_plot(
-    fig: plt.Figure,
+    fig: figure.Figure,
     filename: str,
     plots_dir: Optional[Path] = None,
     dpi: int = 300,
-    **kwargs
+    **kwargs,
 ) -> Path:
     """
     Save matplotlib figure with consistent settings.
@@ -445,13 +449,13 @@ def save_plot(
         Path to saved file
     """
     if plots_dir is None:
-        plots_dir = setup_directories(create=True)['plots']
+        plots_dir = setup_directories(create=True)["plots"]
 
     plots_dir = Path(plots_dir)
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     save_path = plots_dir / filename
-    fig.savefig(save_path, dpi=dpi, bbox_inches='tight', **kwargs)
+    fig.savefig(save_path, dpi=dpi, bbox_inches="tight", **kwargs)
     print(f"Plot saved to: {save_path}")
 
     return save_path
@@ -461,11 +465,8 @@ def save_plot(
 # Printing and Formatting Utilities
 # =============================================================================
 
-def print_section_header(
-    title: str,
-    width: int = 70,
-    char: str = "#"
-) -> None:
+
+def print_section_header(title: str, width: int = 70, char: str = "#") -> None:
     """
     Print a formatted section header.
 
@@ -479,11 +480,7 @@ def print_section_header(
     print(f"{char * width}")
 
 
-def print_subsection_header(
-    title: str,
-    width: int = 70,
-    char: str = "*"
-) -> None:
+def print_subsection_header(title: str, width: int = 70, char: str = "*") -> None:
     """
     Print a formatted subsection header.
 
@@ -546,9 +543,9 @@ def format_percentage(value: float, decimals: int = 2) -> str:
 # Validation Utilities
 # =============================================================================
 
+
 def validate_files_exist(
-    file_paths: List[Path | str],
-    error_on_missing: bool = True
+    file_paths: List[Path | str], error_on_missing: bool = True
 ) -> Tuple[List[Path], List[Path]]:
     """
     Check if files exist and return lists of existing and missing files.
@@ -582,10 +579,9 @@ def validate_files_exist(
 # Configuration Helpers
 # =============================================================================
 
+
 def load_config_set(
-    config_names: List[str],
-    config_dir: Optional[Path] = None,
-    validate: bool = True
+    config_names: List[str], config_dir: Optional[Path] = None, validate: bool = True
 ) -> Dict[str, Dict]:
     """
     Load multiple config files.
@@ -599,7 +595,7 @@ def load_config_set(
         Dictionary mapping config_name to config data
     """
     if config_dir is None:
-        config_dir = setup_directories(create=False)['config']
+        config_dir = setup_directories(create=False)["config"]
 
     configs = {}
     missing = []
@@ -622,6 +618,7 @@ def load_config_set(
 # =============================================================================
 # Summary Statistics
 # =============================================================================
+
 
 def compute_gap(actual: float, optimal: float) -> Optional[float]:
     """
@@ -671,10 +668,10 @@ if __name__ == "__main__":
 
     print_section_header("Filename Generation")
     filename = create_benchmark_filename(
-        'c5_f5_cf1',
+        "c5_f5_cf1",
         [1, 2, 3],
         [10, 20, 50],
-        suffix='bench2',
-        price_levels_list=[5, 10, 15]
+        suffix="bench2",
+        price_levels_list=[5, 10, 15],
     )
     print(f"Benchmark filename: {filename}")

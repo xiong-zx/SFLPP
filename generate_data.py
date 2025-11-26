@@ -10,29 +10,24 @@ Naming conventions:
 # %%
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Dict, Iterator, Sequence
+from typing import Dict, Iterator, Sequence, List
 
 import numpy as np
 
 from core.data import Config, Instance
 from core.extensive_form import ExtensiveForm, sample_extensive_form
+from core.utils import ef_file_path, instance_file_path, config_file_path
 
 # --- Global Switch ---
 # Set to True to use the version with distance-based costs and visualization data.
 # Set to False to use the original simple version.
 USE_DIST_VERSION = True
 
-ROOT = Path(__file__).resolve().parent
-CONFIG_DIR = ROOT / "config"
-DATA_DIR = ROOT / "data_dist" if USE_DIST_VERSION else ROOT / "data"
-CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 
 @dataclass
 class GenerationSettings:
     config_names: Sequence[str] = ()
-    instances_per_config: int = 1
+    instance_idx: int | List[int] = 1
     scenarios: Sequence[int] = ()
     base_seed: int | None = 0  # set to None for nondeterministic seeds
     overwrite: bool = False
@@ -77,7 +72,7 @@ def save_extensive_form(ext: ExtensiveForm, path: Path, overwrite: bool) -> bool
 
 def generate_bundle(
     config_names: Sequence[str],
-    instances_per_config: int,
+    instance_idx: int | List[int],
     scenarios: Sequence[int],
     base_seed: int | None,
     overwrite: bool,
@@ -92,27 +87,29 @@ def generate_bundle(
     stats = {"instances": 0, "efs": 0}
     seeds = seed_stream(base_seed)
 
+    if isinstance(instance_idx, int):
+        instance_idx = [instance_idx]
+
     for config_name in config_names:
-        cfg_path = CONFIG_DIR / f"{config_name}.json"
+        cfg_path = config_file_path(config_name)
         if not cfg_path.exists():
             raise FileNotFoundError(f"Config file not found: {cfg_path}")
 
         cfg = Config.load_json(str(cfg_path))
 
-        for inst_idx in range(1, instances_per_config + 1):
+        for inst_idx in instance_idx:
             inst_seed = next(seeds)
             inst_cfg = replace(cfg, seed=inst_seed)
             inst = Instance.from_config(inst_cfg, use_distance_costs=USE_DIST_VERSION)
-            inst_path = DATA_DIR / f"{instance_name(config_name, inst_idx)}.json"
+            inst_path = instance_file_path(config_name, inst_idx)
+
             if save_instance(inst, inst_path, overwrite):
                 stats["instances"] += 1
 
             for n_scenarios in scenarios:
                 ef_seed = next(seeds)
                 ext = sample_extensive_form(inst, n_scenarios=n_scenarios, seed=ef_seed)
-                ef_path = (
-                    DATA_DIR / f"{ef_name(config_name, inst_idx, n_scenarios)}.pkl"
-                )
+                ef_path = ef_file_path(config_name, inst_idx, n_scenarios)
                 if save_extensive_form(ext, ef_path, overwrite):
                     stats["efs"] += 1
 
@@ -123,29 +120,16 @@ def generate_bundle(
 if __name__ == "__main__":
     # Edit settings here as needed.
     settings = GenerationSettings(
-        # config_names=(
-        #     "c5_f5_cf1",
-        #     "c5_f10_cf1",
-        #     "c10_f5_cf1",
-        #     "c10_f10_cf1",
-        # ),
-        # config_names=(
-        #     "c10_f5_cf2",
-        #     "c10_f5_cf3",
-        #     "c10_f5_cf4",
-        # ),
-        config_names=(
-            "c20_f5_cf7",
-        ),
-        instances_per_config=3,
-        scenarios=(10, 20, 50, 100, 200),
+        config_names=["c20_f10_cf5"],
+        instance_idx=[2],
+        scenarios=[10, 20, 50, 100, 200],
         base_seed=0,
-        overwrite=True,
+        overwrite=False,
     )
 
     stats = generate_bundle(
         config_names=settings.config_names,
-        instances_per_config=settings.instances_per_config,
+        instance_idx=settings.instance_idx,
         scenarios=settings.scenarios,
         base_seed=settings.base_seed,
         overwrite=settings.overwrite,

@@ -8,6 +8,7 @@ Loads a pre-generated instance and its sampled extensive form scenarios, then:
 Results are printed and optionally saved to results/ as CSV and JSON.
 """
 
+# %%
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,14 +20,13 @@ import gurobipy as gp
 import matplotlib.pyplot as plt
 
 from core.data import Instance
-from core.extensive_form import ExtensiveForm
-from core.extensive_form_fixed_price import build_extensive_form_fixed_price_model
+from core.extensive_form import ExtensiveForm, build_extensive_form_model
 from core.discrete_price_milp import build_discrete_price_milp_model
 from core.solver import solve_gurobi_model
 from core.progressive_hedging import solve_with_ph, evaluate_first_stage_solution
 
 # Import utilities from the new utils module
-from utils import (
+from core.utils import (
     setup_directories,
     instance_file_path,
     ef_file_path,
@@ -39,9 +39,9 @@ from utils import (
 
 # Setup directories
 DIRS = setup_directories(use_dist_version=True, create=True)
-ROOT = DIRS['root']
-CONFIG_DIR = DIRS['config']
-DATA_DIR = DIRS['data']
+ROOT = DIRS["root"]
+CONFIG_DIR = DIRS["config"]
+DATA_DIR = DIRS["data"]
 
 
 # --------------------------------------------------------------------------- #
@@ -50,7 +50,7 @@ DATA_DIR = DIRS['data']
 @dataclass
 class Benchmark2Settings:
     config_name: str = "c5_f5_cf1"
-    instance_idx: Optional[List[int]] = None
+    instance_list: Optional[List[int]] = None
     scenarios_list: Optional[List[int]] = None
     alpha: float = 0.1
     price_levels: int = 10  # Number of discrete price levels for MILP
@@ -62,8 +62,8 @@ class Benchmark2Settings:
     ph_tol: float = 1e-4
 
     def __post_init__(self):
-        if self.instance_idx is None:
-            self.instance_idx = [1]
+        if self.instance_list is None:
+            self.instance_list = [1]
         if self.scenarios_list is None:
             self.scenarios_list = [10, 20, 50]
         if self.price_levels_list is None:
@@ -84,7 +84,7 @@ def run_extensive_form(
     """
     n_scenarios = len(ext_form.scenarios)
     start = time.time()
-    model, vars_dict = build_extensive_form_fixed_price_model(ext_form, alpha=alpha)
+    model, vars_dict = build_extensive_form_model(ext_form, alpha=alpha)
     params = dict(gurobi_params or {})
     params.setdefault("OutputFlag", verbose)
     solve_gurobi_model(model, params=params)
@@ -227,8 +227,7 @@ def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> 
     """
     # Filter only discrete price results with valid gap
     discrete_df = df[
-        (df["method"] == "Discrete Price MILP") &
-        (df["gap_vs_continuous"].notna())
+        (df["method"] == "Discrete Price MILP") & (df["gap_vs_continuous"].notna())
     ].copy()
 
     if discrete_df.empty:
@@ -241,7 +240,7 @@ def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> 
 
     # Use different colors and markers for each scenario count
     colors = plt.cm.tab10(np.linspace(0, 1, len(scenarios_list)))
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
+    markers = ["o", "s", "^", "D", "v", "<", ">", "p", "*", "h"]
 
     for idx, n_scen in enumerate(scenarios_list):
         scen_df = discrete_df[discrete_df["n_scenarios"] == n_scen]
@@ -254,12 +253,16 @@ def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> 
             color=colors[idx],
             label=f"S={n_scen}",
             linewidth=2,
-            markersize=8
+            markersize=8,
         )
 
     plt.xlabel("Number of Discrete Price Levels", fontsize=12)
     plt.ylabel("Gap vs Continuous MIQP (%)", fontsize=12)
-    plt.title("Optimality Gap vs Number of Discrete Price Levels", fontsize=14, fontweight='bold')
+    plt.title(
+        "Optimality Gap vs Number of Discrete Price Levels",
+        fontsize=14,
+        fontweight="bold",
+    )
     plt.legend(title="Scenarios", fontsize=10)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -268,9 +271,12 @@ def plot_gap_vs_price_levels(df: pd.DataFrame, settings: Benchmark2Settings) -> 
     Path("results").mkdir(exist_ok=True)
     scenarios_str = "_".join(map(str, settings.scenarios_list))
     price_str = "_".join(map(str, settings.price_levels_list))
-    inst_str = "_".join(map(str, settings.instance_idx))
-    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_gap_vs_price_levels.png"
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    inst_str = "_".join(map(str, settings.instance_list))
+    plot_path = (
+        Path("results")
+        / f"{settings.config_name}_ins{inst_str}_gap_vs_price_levels.png"
+    )
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
     print(f"\nGap plot saved to: {plot_path}")
     plt.close()
 
@@ -303,7 +309,7 @@ def plot_gap_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> Non
             plt.plot(
                 p_df["n_scenarios"],
                 p_df["gap_vs_continuous"] * 100,
-                marker='o',
+                marker="o",
                 linewidth=2,
                 markersize=7,
                 label=f"Discrete MILP p={p_level}",
@@ -317,17 +323,17 @@ def plot_gap_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> Non
         plt.plot(
             ph_df["n_scenarios"],
             ph_df["gap_vs_continuous"] * 100,
-            marker='x',
+            marker="x",
             linewidth=2.5,
             markersize=9,
             label="Progressive Hedging",
-            color='red',
-            linestyle='--'
+            color="red",
+            linestyle="--",
         )
 
     plt.xlabel("Number of Scenarios", fontsize=12)
     plt.ylabel("Gap vs Continuous MIQP (%)", fontsize=12)
-    plt.title("Optimality Gap vs Scenarios", fontsize=14, fontweight='bold')
+    plt.title("Optimality Gap vs Scenarios", fontsize=14, fontweight="bold")
     plt.legend(fontsize=9)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -335,9 +341,11 @@ def plot_gap_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> Non
     Path("results").mkdir(exist_ok=True)
     scenarios_str = "_".join(map(str, settings.scenarios_list))
     price_str = "_".join(map(str, settings.price_levels_list))
-    inst_str = "_".join(map(str, settings.instance_idx))
-    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_gap_vs_scenarios.png"
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    inst_str = "_".join(map(str, settings.instance_list))
+    plot_path = (
+        Path("results") / f"{settings.config_name}_ins{inst_str}_gap_vs_scenarios.png"
+    )
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
     print(f"Gap-vs-scenarios plot saved to: {plot_path}")
     plt.close()
 
@@ -365,12 +373,12 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
         plt.plot(
             continuous_df["n_scenarios"],
             continuous_df["time"],
-            marker='o',
+            marker="o",
             linewidth=2.5,
             markersize=10,
             label="Extensive Form (Continuous Price MIQP)",
-            color='black',
-            linestyle='-'
+            color="black",
+            linestyle="-",
         )
 
     # Plot discrete price MILP for different price levels
@@ -379,8 +387,8 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
 
         # Define colors for different price levels
         colors = plt.cm.viridis(np.linspace(0, 0.9, len(price_levels_list)))
-        markers = ['s', '^', 'D', 'v', 'p', '*', 'h', '<', '>']
-        linestyles = ['-', '--', '-.', ':']
+        markers = ["s", "^", "D", "v", "p", "*", "h", "<", ">"]
+        linestyles = ["-", "--", "-.", ":"]
 
         for idx, p_level in enumerate(price_levels_list):
             p_df = discrete_df[discrete_df["price_levels"] == p_level]
@@ -402,7 +410,7 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
                 markersize=8,
                 label=f"Discrete MILP (p={p_level}, {category})",
                 color=colors[idx],
-                linestyle=linestyles[idx % len(linestyles)]
+                linestyle=linestyles[idx % len(linestyles)],
             )
 
     # Plot PH
@@ -411,29 +419,33 @@ def plot_time_vs_scenarios(df: pd.DataFrame, settings: Benchmark2Settings) -> No
         plt.plot(
             ph_df["n_scenarios"],
             ph_df["time"],
-            marker='x',
+            marker="x",
             linewidth=2.5,
             markersize=9,
             label="Progressive Hedging",
-            color='red',
-            linestyle='--'
+            color="red",
+            linestyle="--",
         )
 
     plt.xlabel("Number of Scenarios", fontsize=12)
     plt.ylabel("Time (seconds)", fontsize=12)
-    plt.title("Computational Time vs Number of Scenarios", fontsize=14, fontweight='bold')
-    plt.legend(fontsize=9, loc='best')
+    plt.title(
+        "Computational Time vs Number of Scenarios", fontsize=14, fontweight="bold"
+    )
+    plt.legend(fontsize=9, loc="best")
     plt.grid(True, alpha=0.3)
-    plt.yscale('log')  # Use log scale for better visualization
+    plt.yscale("log")  # Use log scale for better visualization
     plt.tight_layout()
 
     # Save plot
     Path("results").mkdir(exist_ok=True)
     scenarios_str = "_".join(map(str, settings.scenarios_list))
     price_str = "_".join(map(str, settings.price_levels_list))
-    inst_str = "_".join(map(str, settings.instance_idx))
-    plot_path = Path("results") / f"{settings.config_name}_ins{inst_str}_time_vs_scenarios.png"
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    inst_str = "_".join(map(str, settings.instance_list))
+    plot_path = (
+        Path("results") / f"{settings.config_name}_ins{inst_str}_time_vs_scenarios.png"
+    )
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
     print(f"Time plot saved to: {plot_path}")
     plt.close()
 
@@ -446,7 +458,7 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     Compare Continuous Price MIQP vs Discrete Price MILP across instances and scenario counts.
     """
     config_name = settings.config_name
-    instance_list = settings.instance_idx
+    instance_list = settings.instance_list
     scenarios_list = settings.scenarios_list
     price_levels_list = settings.price_levels_list
 
@@ -487,7 +499,9 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
             ef_res["instance"] = inst_idx
             ef_res["config"] = config_name
             all_results.append(ef_res)
-            print(f"[Continuous Price MIQP] status={ef_res['status']} obj={ef_res['objective']} time={ef_res['time']:.2f}s")
+            print(
+                f"[Continuous Price MIQP] status={ef_res['status']} obj={ef_res['objective']} time={ef_res['time']:.2f}s"
+            )
 
             # 2) Discrete price MILP (sweep price levels)
             for p_levels in price_levels_list:
@@ -501,10 +515,17 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
                 discrete_res["instance"] = inst_idx
                 discrete_res["config"] = config_name
 
-                if ef_res.get("objective") is not None and discrete_res.get("objective") is not None:
+                if (
+                    ef_res.get("objective") is not None
+                    and discrete_res.get("objective") is not None
+                ):
                     continuous_obj = ef_res["objective"]
                     discrete_obj = discrete_res["objective"]
-                    discrete_res["gap_vs_continuous"] = (discrete_obj - continuous_obj) / abs(continuous_obj) if abs(continuous_obj) > 1e-8 else None
+                    discrete_res["gap_vs_continuous"] = (
+                        (discrete_obj - continuous_obj) / abs(continuous_obj)
+                        if abs(continuous_obj) > 1e-8
+                        else None
+                    )
 
                 all_results.append(discrete_res)
                 print(
@@ -527,10 +548,17 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
                 ph_res["instance"] = inst_idx
                 ph_res["config"] = config_name
 
-                if ef_res.get("objective") is not None and ph_res.get("objective") is not None:
+                if (
+                    ef_res.get("objective") is not None
+                    and ph_res.get("objective") is not None
+                ):
                     continuous_obj = ef_res["objective"]
                     ph_obj = ph_res["objective"]
-                    ph_res["gap_vs_continuous"] = (ph_obj - continuous_obj) / abs(continuous_obj) if abs(continuous_obj) > 1e-8 else None
+                    ph_res["gap_vs_continuous"] = (
+                        (ph_obj - continuous_obj) / abs(continuous_obj)
+                        if abs(continuous_obj) > 1e-8
+                        else None
+                    )
 
                 all_results.append(ph_res)
                 print(
@@ -550,9 +578,9 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
             config_name=config_name,
             instance_list=instance_list,
             scenarios_list=scenarios_list,
-            results_dir=DIRS['results'],
-            suffix='bench2',
-            price_levels_list=price_levels_list
+            results_dir=DIRS["results"],
+            suffix="bench2",
+            price_levels_list=price_levels_list,
         )
 
     # Generate plots
@@ -565,10 +593,11 @@ def run_benchmark(settings: Benchmark2Settings) -> pd.DataFrame:
     return df
 
 
+# %%
 if __name__ == "__main__":
     SETTINGS = Benchmark2Settings(
         config_name="c50_f20_cf6",
-        instance_idx=[1],
+        instance_list=[1],
         scenarios_list=[10, 20, 50, 100, 200],
         price_levels_list=[3, 5, 8, 10, 15],
         alpha=0.1,
@@ -579,3 +608,4 @@ if __name__ == "__main__":
         ph_tol=1e-4,
     )
     run_benchmark(SETTINGS)
+# %%
